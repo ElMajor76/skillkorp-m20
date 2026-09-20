@@ -36,21 +36,17 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
         GLib.timeout_add_seconds(1, self._periodic_refresh)
 
     def _init_header_bar(self):
-        # We add an apply button to the header
-        self.apply_btn = Gtk.Button(label="Appliquer")
-        self.apply_btn.add_css_class("suggested-action")
-        self.apply_btn.connect("clicked", self._on_apply_clicked)
-
         self.conn_label = Gtk.Label(label="Connectée")
         self.conn_label.add_css_class("success")
-
-        # Battery label
         self.bat_label = Gtk.Label(label="🔋 100%")
-
-        # We can add them to the titlebar or end of pages
-        # In AdwPreferencesWindow, we can pack into header using search_enabled or custom
-        # Let's add an action to the window
         pass
+
+    def _on_apply_all_clicked(self, button=None):
+        self._on_apply_dpi_clicked()
+        time.sleep(0.3)
+        self._on_apply_buttons_clicked()
+        time.sleep(0.3)
+        self._on_apply_power_clicked()
 
     def _init_dpi_page(self):
         page = Adw.PreferencesPage(title="DPI & Capteur", icon_name="input-mouse-symbolic")
@@ -133,7 +129,7 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
         btn.add_css_class("suggested-action")
         btn.add_css_class("pill")
         btn.set_halign(Gtk.Align.CENTER)
-        btn.connect("clicked", self._on_apply_clicked)
+        btn.connect("clicked", self._on_apply_dpi_clicked)
         apply_group.add(btn)
 
     def _init_buttons_page(self):
@@ -179,7 +175,7 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
         btn = Gtk.Button(label="Enregistrer & Appliquer les Boutons")
         btn.add_css_class("suggested-action")
         btn.add_css_class("pill")
-        btn.connect("clicked", self._on_apply_clicked)
+        btn.connect("clicked", self._on_apply_buttons_clicked)
         btn_box.append(btn)
 
         rst_btn = Gtk.Button(label="Restaurer par Défaut")
@@ -229,12 +225,11 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
         btn.add_css_class("suggested-action")
         btn.add_css_class("pill")
         btn.set_halign(Gtk.Align.CENTER)
-        btn.connect("clicked", self._on_apply_clicked)
+        btn.connect("clicked", self._on_apply_power_clicked)
         apply_group.add(btn)
 
-    def _on_apply_clicked(self, button=None):
+    def _on_apply_dpi_clicked(self, button=None):
         try:
-            # 1. DPI
             stages = [int(spin.get_value()) for spin in self.stage_spinners]
             active_stage = 1
             for idx, r in enumerate(self.stage_radios):
@@ -257,25 +252,30 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
                 angle_snap=angle,
                 ripple=ripple,
             )
-            time.sleep(0.05)
+            self._show_toast("✓ Paramètres DPI et capteur appliqués !")
+        except Exception as e:
+            self._show_toast(f"Erreur DPI : {e}")
 
-            # 2. Buttons
+    def _on_apply_buttons_clicked(self, button=None):
+        try:
             btn_map = {}
             for i, combo in enumerate(self.btn_combos):
                 action_idx = combo.get_selected()
                 act_key = self.btn_action_keys[action_idx]
                 btn_map[i + 1] = act_key
             self.driver.set_buttons(btn_map)
-            time.sleep(0.05)
+            self._show_toast("✓ Mappage des boutons appliqué à la souris !")
+        except Exception as e:
+            self._show_toast(f"Erreur Boutons : {e}")
 
-            # 3. Polling Rate
+    def _on_apply_power_clicked(self, button=None):
+        try:
             rate_idx = self.rate_row.get_selected()
             rate_hz = [125, 250, 500, 1000][rate_idx]
             self.driver.set_polling_rate(rate_hz)
-
-            self._show_toast("✓ Paramètres appliqués à la souris avec succès !")
+            self._show_toast(f"✓ Fréquence de rapport {rate_hz} Hz appliquée !")
         except Exception as e:
-            self._show_toast(f"Erreur : {e}")
+            self._show_toast(f"Erreur Taux : {e}")
 
     def _on_restore_buttons_clicked(self, widget):
         try:

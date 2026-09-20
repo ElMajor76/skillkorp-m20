@@ -52,8 +52,9 @@ LIGHT_MODES = [
     ("marquee_2", "Défilement 2 (Marquee 2)", 12),
 ]
 
-# Exact hardware firmware button action codes from MU_SkillKorp.exe jump table
+# Exact hardware firmware button action codes from MU_SkillKorp.exe table at 0x41c450
 BUTTON_ACTIONS = {
+    # Basic Mouse Actions
     "left_click": ("Clic Gauche", 0x02, 0x00, 0x00),
     "right_click": ("Clic Droit", 0x03, 0x00, 0x00),
     "middle_click": ("Bouton Central (Molette)", 0x04, 0x00, 0x00),
@@ -61,23 +62,51 @@ BUTTON_ACTIONS = {
     "backward": ("Précédent / Arrière", 0x05, 0x00, 0x00),
     "double_click": ("Double Clic", 0x07, 0x00, 0x00),
     "fire_button": ("Bouton de Tir (Rapid Fire)", 0x08, 0x00, 0x00),
-    "easy_aim": ("Visée Facile (Sniper)", 0x0E, 0x00, 0x00),
-    "led_loop": ("Basculer LED (Light Loop)", 0x0F, 0x00, 0x00),
+    "scroll_up": ("Défilement Molette Haut", 0x09, 0x00, 0x00),
+    "scroll_down": ("Défilement Molette Bas", 0x0A, 0x00, 0x00),
+
+    # DPI Actions
     "dpi_cycle": ("Cycle DPI", 0x0D, 0x00, 0x00),
     "dpi_up": ("DPI +", 0x0E, 0x00, 0x00),
     "dpi_down": ("DPI -", 0x0F, 0x00, 0x00),
-    "profile_cycle": ("Cycle Profil", 0x0A, 0x00, 0x00),
-    "profile_up": ("Profil +", 0x0B, 0x00, 0x00),
-    "profile_down": ("Profil -", 0x0C, 0x00, 0x00),
-    "media_play_pause": ("Lecture / Pause", 0x16, 0x00, 0x00),
-    "media_stop": ("Arrêt Média", 0x17, 0x00, 0x00),
-    "media_prev": ("Piste Précédente", 0x18, 0x00, 0x00),
-    "media_next": ("Piste Suivante", 0x19, 0x00, 0x00),
-    "media_vol_up": ("Volume +", 0x1A, 0x00, 0x00),
-    "media_vol_down": ("Volume -", 0x1B, 0x00, 0x00),
-    "media_mute": ("Muet", 0x1C, 0x00, 0x00),
-    "browser_home": ("Accueil Navigateur", 0x1D, 0x00, 0x00),
-    "calculator": ("Calculatrice", 0x1E, 0x00, 0x00),
+
+    # Multimedia (Consumer Control)
+    "media_player": ("Lecteur Multimédia", 0x15, 0x00, 0x00),
+    "media_play_pause": ("Lecture / Pause", 0x18, 0x00, 0x00),
+    "media_stop": ("Arrêt Média", 0x19, 0x00, 0x00),
+    "media_prev": ("Piste Précédente", 0x16, 0x00, 0x00),
+    "media_next": ("Piste Suivante", 0x17, 0x00, 0x00),
+    "media_vol_up": ("Volume +", 0x1B, 0x00, 0x00),
+    "media_vol_down": ("Volume -", 0x1C, 0x00, 0x00),
+    "media_mute": ("Muet", 0x1A, 0x00, 0x00),
+
+    # Web Browser
+    "browser_home": ("Accueil Navigateur", 0x25, 0x00, 0x00),
+    "browser_favorites": ("Favoris (Ctrl+Shift+O)", 0x11, 0x03, 0x12),
+    "browser_forward": ("Navigateur Page Suivante", 0x20, 0x00, 0x00),
+    "browser_backward": ("Navigateur Page Précédente", 0x21, 0x00, 0x00),
+    "browser_stop": ("Navigateur Arrêter", 0x22, 0x00, 0x00),
+    "browser_refresh": ("Actualiser Page", 0x24, 0x00, 0x00),
+    "browser_search": ("Recherche Web", 0x26, 0x00, 0x00),
+
+    # Office & System Shortcuts
+    "copy": ("Copier (Ctrl+C)", 0x11, 0x01, 0x06),
+    "paste": ("Coller (Ctrl+V)", 0x11, 0x01, 0x19),
+    "cut": ("Couper (Ctrl+X)", 0x11, 0x01, 0x1B),
+    "select_all": ("Tout Sélectionner (Ctrl+A)", 0x11, 0x01, 0x04),
+    "save": ("Enregistrer (Ctrl+S)", 0x11, 0x01, 0x16),
+    "find": ("Rechercher (Ctrl+F)", 0x11, 0x01, 0x09),
+    "undo": ("Annuler (Ctrl+Z)", 0x11, 0x01, 0x1D),
+    "redo": ("Rétablir (Ctrl+Y)", 0x11, 0x01, 0x1C),
+    "close_window": ("Fermer Fenêtre (Alt+F4)", 0x11, 0x04, 0x3D),
+    "show_desktop": ("Afficher Bureau (Win+D)", 0x11, 0x08, 0x07),
+    "lock_pc": ("Verrouiller PC (Win+L)", 0x11, 0x08, 0x0F),
+    "calculator": ("Calculatrice", 0x1D, 0x00, 0x00),
+    "my_computer": ("Poste de Travail (Fichiers)", 0x23, 0x00, 0x00),
+    "email": ("Messagerie (Email)", 0x1E, 0x00, 0x00),
+
+    # Gaming & Special
+    "easy_aim": ("Visée Facile (Sniper)", 0x10, 0x00, 0x03),
     "disabled": ("Désactivé", 0x01, 0x00, 0x00),
 }
 
@@ -460,6 +489,7 @@ class SkillkorpM20Driver:
         if success:
             self.config["buttons"] = {str(k): v for k, v in sorted(merged_map.items())}
             self._save_config()
+            time.sleep(0.3)
         return success
 
     def restore_factory_buttons(self) -> bool:
