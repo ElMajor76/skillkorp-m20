@@ -358,7 +358,10 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
         # Left: Interactive Mouse Schematic Card
         schematic_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         schematic_card.add_css_class("card")
-        schematic_card.set_padding = 12
+        schematic_card.set_margin_top(4)
+        schematic_card.set_margin_bottom(4)
+        schematic_card.set_margin_start(4)
+        schematic_card.set_margin_end(4)
         schematic_card.set_size_request(260, 360)
 
         svg_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "assets", "m20_schematic.svg")
@@ -383,8 +386,11 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
         hbox.append(schematic_card)
 
         # Right: The 6 Buttons ComboRows
-        btn_rows_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        btn_rows_box = Gtk.ListBox()
+        btn_rows_box.add_css_class("boxed-list")
+        btn_rows_box.set_selection_mode(Gtk.SelectionMode.NONE)
         btn_rows_box.set_hexpand(True)
+        btn_rows_box.set_valign(Gtk.Align.CENTER)
 
         self.btn_action_keys = list(BUTTON_ACTIONS.keys())
         btn_action_labels = [info[0] for info in BUTTON_ACTIONS.values()]
@@ -423,6 +429,8 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
 
         btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         btn_box.set_halign(Gtk.Align.CENTER)
+        btn_box.set_margin_top(8)
+        btn_box.set_margin_bottom(8)
 
         btn = Gtk.Button(label="Enregistrer & Appliquer les Boutons")
         btn.add_css_class("suggested-action")
@@ -443,6 +451,7 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
         if 0 <= idx < len(self.btn_combos):
             combo = self.btn_combos[idx]
             combo.grab_focus()
+            combo.activate()
             self._show_toast(f"Bouton {btn_num} sélectionné")
 
     # -------------------------------------------------------------------------
