@@ -14,7 +14,7 @@ import time
 
 REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__))))
 DIST_DIR = os.path.join(REPO_DIR, "dist")
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 RELEASE = "1"
 PKG_NAME = "skillkorp-m20"
 
@@ -229,6 +229,7 @@ def build_source_tarball():
             "install.sh",
             "LICENSE",
             "README.md",
+            "CHANGELOG.md",
             "io.github.skillkorp.m20.desktop",
         ]:
             fp = os.path.join(REPO_DIR, f)

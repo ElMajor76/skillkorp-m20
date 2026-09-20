@@ -12,3 +12,4 @@ venv/
 dist/
 build_rpm/
 build_deb/
+.github/

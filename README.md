@@ -24,7 +24,7 @@ L'analyse binaire approfondie (`MU_SkillKorp.exe` et `hiddriver_1.dll`) a permis
 3. **Mise en veille & Réveil (Report ID `0x05` - 15 octets)** :
    Délai avant mise en veille matérielle (1 à 60 minutes) et mode de réveil (mouvement vs clic requis) avec somme de contrôle sur 16 bits.
 4. **Attribution des Boutons (Report ID `0x08` - 59 octets)** :
-   Configuration des 5 boutons physiques et défilement avec table d'actions matérielles (clic gauche, clic droit, molette, avant, arrière, multimédia, raccourcis système).
+   Configuration des **6 boutons physiques** (dont le bouton DPI bas du pouce) et défilement avec table d'actions matérielles (clic gauche, clic droit, molette, avant, arrière, cycle DPI, multimédia, raccourcis système).
 5. **Requête d'état & Batterie (Report ID `0x0C` & `0x03`)** :
    Envoi de la requête `0x0C`, réception de la trame `0x03 0x10 0x40 [statut_charge] [pourcentage_batterie]`.
 
@@ -59,8 +59,9 @@ m20ctl dpi --stages 400,800,1600,3200,6400,26000 --active 2
 # Ajuster les paramètres avancés du capteur PixArt
 m20ctl sensor --lod 1 --debounce 4 --motion-sync on --angle-snap off
 
-# Réassigner un bouton
+# Réassigner un bouton (boutons 1 à 6 — le bouton 6 est le DPI Cycle, bas du pouce)
 m20ctl button --btn 4 --action forward
+m20ctl button --btn 6 --action dpi_cycle
 m20ctl button --list-actions
 
 # Restaurer le mappage d'usine par défaut des boutons

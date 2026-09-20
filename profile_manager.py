@@ -307,7 +307,7 @@ class ProfileManager:
 
         # Validate button actions
         from m20_driver import BUTTON_ACTIONS
-        valid_actions = {a[0] for a in BUTTON_ACTIONS}
+        valid_actions = set(BUTTON_ACTIONS.keys())
         buttons = data.get("buttons", {})
         if not isinstance(buttons, dict):
             raise ValueError("'buttons' doit être un objet JSON.")

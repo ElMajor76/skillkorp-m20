@@ -1,0 +1,5 @@
+# Dépendances pour le développement et les tests
+# (les dépendances runtime GTK4/AppIndicator sont des paquets système)
+
+pytest>=7.0
+flake8>=6.0

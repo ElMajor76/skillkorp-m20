@@ -1,7 +1,7 @@
 %{!?_udevrulesdir: %global _udevrulesdir %{_prefix}/lib/udev/rules.d}
 
 Name:           skillkorp-m20
-Version:        1.0.0
+Version:        1.1.0
 Release:        1%{?dist}
 Summary:        Pilote et interface graphique Linux pour souris SkillKorp M20 Ultimate
 License:        MIT
@@ -73,5 +73,15 @@ update-desktop-database %{_datadir}/applications >/dev/null 2>&1 || :
 %{_datadir}/icons/hicolor/256x256/apps/skillkorp-m20.png
 
 %changelog
+* Sat Sep 20 2026 nplacide <nplacide95@gmail.com> - 1.1.0-1
+- Correctifs critiques: move_to_wake, apply_all RGB, clamp active_stage
+- Bouton 6 (DPI Cycle) accessible depuis GUI et CLI
+- Fichier PID pour la détection du tray (m20 tray stop/status)
+- Verrou fcntl.flock contre corruption JSON multi-processus
+- Duplication is_autostart/set_autostart supprimée (profile_manager = source de vérité)
+- Validation complète dans import_profile (DPI, polling_rate, actions boutons)
+- udev MODE=0660 (remplace 0666 redondant)
+- RPM Recommends libayatana-appindicator-gtk3
+- 38 tests unitaires pytest + workflow CI GitHub Actions
 * Sun Sep 20 2026 nplacide <nplacide95@gmail.com> - 1.0.0-1
 - Version initiale avec support sans fil 2.4 GHz et filaire USB-C
