@@ -230,20 +230,48 @@ def cmd_profile(driver: SkillkorpM20Driver, args):
 
 
 def get_tray_pids() -> list:
+    """Return list of running m20-tray PIDs.
+    Reads ~/.config/skillkorp-m20/tray.pid first (written by m20_tray.py on startup),
+    then falls back to pgrep to catch instances started any other way.
+    """
+    pid_file = os.path.expanduser("~/.config/skillkorp-m20/tray.pid")
+    my_pid = os.getpid()
     pids = []
-    try:
-        out = subprocess.check_output(["pgrep", "-f", "m20_tray.py"], text=True)
-        my_pid = os.getpid()
-        for line in out.strip().splitlines():
+
+    # 1. Check PID file
+    if os.path.exists(pid_file):
+        try:
+            stored_pid = int(open(pid_file).read().strip())
+            # Verify the process is still alive
+            if stored_pid != my_pid:
+                os.kill(stored_pid, 0)  # raises OSError if dead
+                pids.append(stored_pid)
+        except (ValueError, OSError):
+            # Stale PID file — remove it
             try:
-                p = int(line.strip())
-                if p != my_pid:
-                    pids.append(p)
-            except ValueError:
+                os.remove(pid_file)
+            except OSError:
                 pass
-    except subprocess.CalledProcessError:
-        pass
+
+    # 2. Fallback: pgrep -f to catch instances launched via m20-tray symlink or directly
+    if not pids:
+        try:
+            out = subprocess.check_output(
+                ["pgrep", "-f", r"m20_tray\.py|m20-tray"],
+                text=True,
+            )
+            for line in out.strip().splitlines():
+                try:
+                    p = int(line.strip())
+                    if p != my_pid and p not in pids:
+                        pids.append(p)
+                except ValueError:
+                    pass
+        except subprocess.CalledProcessError:
+            pass
+
     return pids
+
 
 
 def cmd_tray(driver: SkillkorpM20Driver, args):
@@ -380,7 +408,7 @@ def main():
 
     # button
     p_button = subparsers.add_parser("button", help="Configuration des boutons")
-    p_button.add_argument("--btn", type=int, choices=range(1, 6), help="Numéro du bouton (1 à 5)")
+    p_button.add_argument("--btn", type=int, choices=range(1, 7), help="Numéro du bouton (1 à 6)")
     p_button.add_argument("--action", type=str, help="Nom de l'action à assigner")
     p_button.add_argument("--list-actions", action="store_true", help="Lister les actions disponibles")
     p_button.set_defaults(func=cmd_button)

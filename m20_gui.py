@@ -374,7 +374,7 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
         pill_box.set_halign(Gtk.Align.CENTER)
         pill_box.set_margin_bottom(8)
 
-        for btn_num in range(1, 6):
+        for btn_num in range(1, 7):
             btn_pill = Gtk.Button(label=f"[{btn_num}]")
             btn_pill.add_css_class("circular")
             btn_pill.connect("clicked", self._on_schematic_btn_clicked, btn_num)
@@ -382,7 +382,7 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
         schematic_card.append(pill_box)
         hbox.append(schematic_card)
 
-        # Right: The 5 Buttons ComboRows
+        # Right: The 6 Buttons ComboRows
         btn_rows_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         btn_rows_box.set_hexpand(True)
 
@@ -394,16 +394,18 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
             "3. Molette (Clic Central)",
             "4. Latéral Avant (Suivant)",
             "5. Latéral Arrière (Précédent)",
+            "6. DPI Cycle (Bas du pouce)",
         ]
+        default_actions = ["left_click", "right_click", "middle_click", "forward", "backward", "dpi_cycle"]
         current_buttons = self.driver.config.get("buttons", {})
 
         self.btn_combos = []
-        for i in range(1, 6):
+        for i in range(1, 7):
             row = Adw.ComboRow(title=button_names[i - 1])
             string_list = Gtk.StringList.new(btn_action_labels)
             row.set_model(string_list)
 
-            cur_act = current_buttons.get(str(i), "left_click" if i == 1 else "right_click" if i == 2 else "middle_click" if i == 3 else "forward" if i == 4 else "backward")
+            cur_act = current_buttons.get(str(i), default_actions[i - 1])
             try:
                 selected_idx = self.btn_action_keys.index(cur_act)
             except ValueError:

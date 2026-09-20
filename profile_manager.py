@@ -59,6 +59,10 @@ DEFAULT_PROFILES: Dict[str, Dict[str, Any]] = {
         "ripple": False,
         "sleep_timer_minutes": 5,
         "move_to_wake": True,
+        "light_mode": "static",
+        "brightness": 8,
+        "speed": 4,
+        "light_color": [255, 0, 0],
         "buttons": {
             "1": "left_click",
             "2": "right_click",
@@ -82,6 +86,10 @@ DEFAULT_PROFILES: Dict[str, Dict[str, Any]] = {
         "ripple": False,
         "sleep_timer_minutes": 10,
         "move_to_wake": True,
+        "light_mode": "breathing",
+        "brightness": 6,
+        "speed": 4,
+        "light_color": [255, 64, 0],
         "buttons": {
             "1": "left_click",
             "2": "right_click",
@@ -115,6 +123,10 @@ DEFAULT_PROFILES: Dict[str, Dict[str, Any]] = {
         "ripple": False,
         "sleep_timer_minutes": 3,
         "move_to_wake": False,
+        "light_mode": "static",
+        "brightness": 2,
+        "speed": 4,
+        "light_color": [0, 120, 255],
         "buttons": {
             "1": "left_click",
             "2": "right_click",
@@ -169,8 +181,8 @@ class ProfileManager:
             try:
                 with open(self.state_file, "r", encoding="utf-8") as f:
                     return json.load(f)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[profile_manager] Erreur lecture état: {e}", file=sys.stderr)
         return {"active_profile": "default", "auto_switch_enabled": True}
 
     def _save_state(self, state: Dict[str, Any]):
@@ -263,13 +275,58 @@ class ProfileManager:
         return True
 
     def import_profile(self, source_file: str, new_id: Optional[str] = None) -> str:
+        """Import a profile from a JSON file with full validation."""
         with open(source_file, "r", encoding="utf-8") as f:
             data = json.load(f)
+
+        if not isinstance(data, dict):
+            raise ValueError("Le fichier de profil doit être un objet JSON.")
+
+        # Validate DPI stages
+        stages = data.get("dpi_stages")
+        if stages is not None:
+            if not isinstance(stages, list) or not (1 <= len(stages) <= 8):
+                raise ValueError("dpi_stages doit être une liste de 1 à 8 valeurs.")
+            for s in stages:
+                if not isinstance(s, int) or not (50 <= s <= 26000):
+                    raise ValueError(f"DPI invalide: {s} (plage: 50–26000).")
+
+        # Validate active_stage
+        active = data.get("active_stage")
+        if active is not None:
+            if stages is None:
+                stages = [400, 800, 1600, 3200, 6400, 26000]
+            if not isinstance(active, int) or not (1 <= active <= len(stages)):
+                raise ValueError(f"active_stage {active} hors limites (1–{len(stages)}).")
+
+        # Validate polling_rate
+        valid_rates = [125, 250, 500, 1000]
+        rate = data.get("polling_rate")
+        if rate is not None and rate not in valid_rates:
+            raise ValueError(f"polling_rate invalide: {rate}. Valeurs acceptées: {valid_rates}.")
+
+        # Validate button actions
+        from m20_driver import BUTTON_ACTIONS
+        valid_actions = {a[0] for a in BUTTON_ACTIONS}
+        buttons = data.get("buttons", {})
+        if not isinstance(buttons, dict):
+            raise ValueError("'buttons' doit être un objet JSON.")
+        for btn_key, action in buttons.items():
+            try:
+                btn_num = int(btn_key)
+                if not (1 <= btn_num <= 6):
+                    raise ValueError(f"Numéro de bouton invalide: {btn_key} (1–6).")
+            except (ValueError, TypeError):
+                raise ValueError(f"Clé de bouton invalide: {btn_key!r} (doit être un entier).")
+            if action not in valid_actions:
+                raise ValueError(f"Action invalide pour le bouton {btn_key}: '{action}'.")
+
         prof_id = new_id or data.get("id") or os.path.basename(source_file).replace(".json", "")
         safe_id = re.sub(r"[^a-zA-Z0-9_\-]", "_", prof_id).lower()
         data["id"] = safe_id
         self.save_profile(safe_id, data)
         return safe_id
+
 
     def switch_profile(self, prof_id: str, driver: Optional[Any] = None) -> Dict[str, Any]:
         prof = self.get_profile(prof_id)
@@ -303,15 +360,25 @@ class ProfileManager:
         if "polling_rate" in prof:
             driver.set_polling_rate(prof["polling_rate"])
 
-        # 3. Button remap
+        # 3. RGB Lighting
+        if hasattr(driver, "set_rgb_lighting"):
+            driver.set_rgb_lighting(
+                mode=prof.get("light_mode", "static"),
+                brightness=prof.get("brightness", 8),
+                speed=prof.get("speed", 4),
+                color=tuple(prof.get("light_color", [255, 0, 0])),
+            )
+
+        # 4. Button remap
         if "buttons" in prof:
             driver.set_buttons({int(k): v for k, v in prof["buttons"].items()})
 
-        # 4. Power & Sleep settings
+        # 5. Power & Sleep settings
         sleep_min = prof.get("sleep_timer_minutes", 5)
         move_wake = prof.get("move_to_wake", True)
         if hasattr(driver, "set_power_settings"):
             driver.set_power_settings(sleep_timer_minutes=sleep_min, move_to_wake=move_wake)
+
 
 
 def detect_active_window_class() -> Optional[str]:

@@ -12,6 +12,9 @@ Requires:       python3
 Requires:       python3-gobject
 Requires:       libadwaita
 Requires:       systemd-udev
+# Pour l'indicateur système (tray) — au moins l'un des deux doit être installé
+Recommends:     libayatana-appindicator-gtk3
+Recommends:     libappindicator-gtk3
 
 %description
 Pilote natif sous Linux, outil CLI (m20ctl) et application GTK 4 / Libadwaita

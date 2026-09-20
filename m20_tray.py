@@ -35,36 +35,12 @@ except Exception:
     HAS_NOTIFY = False
 
 from m20_driver import SkillkorpM20Driver
-from profile_manager import ProfileManager, detect_active_window_class
-
-AUTOSTART_DIR = os.path.expanduser("~/.config/autostart")
-AUTOSTART_FILE = os.path.join(AUTOSTART_DIR, "io.github.skillkorp.m20.tray.desktop")
-
-
-def is_autostart_enabled() -> bool:
-    return os.path.exists(AUTOSTART_FILE)
-
-
-def set_autostart(enabled: bool):
-    os.makedirs(AUTOSTART_DIR, exist_ok=True)
-    if enabled:
-        content = """[Desktop Entry]
-Type=Application
-Name=SkillKorp M20 Tray
-Comment=Indicateur de batterie et raccourcis SkillKorp M20
-Exec=m20-tray
-Icon=skillkorp-m20
-Terminal=false
-Categories=Utility;
-StartupNotify=false
-X-GNOME-Autostart-enabled=true
-"""
-        with open(AUTOSTART_FILE, "w") as f:
-            f.write(content)
-    else:
-        if os.path.exists(AUTOSTART_FILE):
-            os.remove(AUTOSTART_FILE)
-
+from profile_manager import (
+    ProfileManager,
+    detect_active_window_class,
+    is_autostart_enabled,
+    set_autostart,
+)
 
 class M20TrayApp:
     def __init__(self):
@@ -81,6 +57,14 @@ class M20TrayApp:
         self.last_profile_id: str = self.pm.get_active_profile_id()
         self.warned_low_20 = False
         self.warned_low_10 = False
+
+        # Diff tracking for submenus (avoid full rebuild every 2s)
+        self._last_stages: Optional[List[int]] = None
+        self._last_active_stage: Optional[int] = None
+        self._last_rate: Optional[int] = None
+        self._last_profiles_snapshot: Optional[List[str]] = None  # list of profile ids
+        self._last_active_profile_id: Optional[str] = None
+
 
         self.indicator = appindicator.Indicator.new(
             "skillkorp-m20-indicator",
@@ -334,11 +318,28 @@ class M20TrayApp:
             label_text = f"🔋 Batterie : {battery}%"
         self.header_item.set_label(f"● SkillKorp M20 — {label_text}")
 
-        # 2. Update submenus
+        # 2. Update submenus only when data has changed (Bug 11 — avoid full rebuild every 2s)
         self._updating_menu = True
-        self._populate_profile_submenu()
-        self._populate_dpi_submenu(stages, active_stage)
-        self._populate_rate_submenu(polling)
+        # Profiles submenu: rebuild if profile list or active profile changed
+        profiles = self.pm.list_profiles()
+        current_profile_ids = [p["id"] for p in profiles]
+        current_active = self.pm.get_active_profile_id()
+        if current_profile_ids != self._last_profiles_snapshot or current_active != self._last_active_profile_id:
+            self._populate_profile_submenu()
+            self._last_profiles_snapshot = current_profile_ids
+            self._last_active_profile_id = current_active
+
+        # DPI submenu: rebuild only if stages or active stage changed
+        if stages != self._last_stages or active_stage != self._last_active_stage:
+            self._populate_dpi_submenu(stages, active_stage)
+            self._last_stages = list(stages)
+            self._last_active_stage = active_stage
+
+        # Rate submenu: rebuild only if polling rate changed
+        if polling != self._last_rate:
+            self._populate_rate_submenu(polling)
+            self._last_rate = polling
+
         self._updating_menu = False
 
         # 3. Detect hardware DPI button press
@@ -417,9 +418,29 @@ class M20TrayApp:
         return True
 
 
+PID_FILE = os.path.join(os.path.expanduser("~/.config/skillkorp-m20"), "tray.pid")
+
+
+def _write_pid():
+    os.makedirs(os.path.dirname(PID_FILE), exist_ok=True)
+    with open(PID_FILE, "w") as f:
+        f.write(str(os.getpid()))
+
+
+def _remove_pid():
+    try:
+        os.remove(PID_FILE)
+    except OSError:
+        pass
+
+
 def main():
-    app = M20TrayApp()
-    Gtk.main()
+    _write_pid()
+    try:
+        app = M20TrayApp()
+        Gtk.main()
+    finally:
+        _remove_pid()
 
 
 if __name__ == "__main__":

@@ -569,9 +569,13 @@ class SkillkorpM20Driver:
         if os.path.exists(DEFAULT_PROFILE_FILE):
             try:
                 with open(DEFAULT_PROFILE_FILE, "r") as f:
-                    return json.load(f)
-            except Exception:
-                pass
+                    fcntl.flock(f, fcntl.LOCK_SH)
+                    try:
+                        return json.load(f)
+                    finally:
+                        fcntl.flock(f, fcntl.LOCK_UN)
+            except Exception as e:
+                print(f"[m20_driver] Erreur lecture config: {e}", file=sys.stderr)
 
         default_conf = {
             "polling_rate": 1000,
@@ -612,11 +616,17 @@ class SkillkorpM20Driver:
         return default_conf
 
     def _save_config(self):
-        """Save current configuration to disk."""
+        """Save current configuration to disk (with exclusive lock to avoid concurrent write corruption)."""
         os.makedirs(CONFIG_DIR, exist_ok=True)
+        tmp_path = DEFAULT_PROFILE_FILE + ".tmp"
         try:
-            with open(DEFAULT_PROFILE_FILE, "w") as f:
-                json.dump(self.config, f, indent=2)
+            with open(tmp_path, "w") as f:
+                fcntl.flock(f, fcntl.LOCK_EX)
+                try:
+                    json.dump(self.config, f, indent=2)
+                finally:
+                    fcntl.flock(f, fcntl.LOCK_UN)
+            os.replace(tmp_path, DEFAULT_PROFILE_FILE)
         except Exception as e:
             print(f"[m20_driver] Erreur sauvegarde config: {e}", file=sys.stderr)
 
