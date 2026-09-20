@@ -69,6 +69,7 @@ DEFAULT_PROFILES: Dict[str, Dict[str, Any]] = {
             "3": "middle_click",
             "4": "forward",
             "5": "backward",
+            "6": "dpi_cycle",
         },
         "auto_switch_apps": [],
     },
@@ -96,6 +97,7 @@ DEFAULT_PROFILES: Dict[str, Dict[str, Any]] = {
             "3": "middle_click",
             "4": "forward",
             "5": "backward",
+            "6": "dpi_cycle",
         },
         "auto_switch_apps": [
             "cs2",
@@ -133,6 +135,7 @@ DEFAULT_PROFILES: Dict[str, Dict[str, Any]] = {
             "3": "middle_click",
             "4": "copy",
             "5": "paste",
+            "6": "dpi_cycle",
         },
         "auto_switch_apps": [
             "code",

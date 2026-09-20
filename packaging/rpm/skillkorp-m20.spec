@@ -1,7 +1,7 @@
 %{!?_udevrulesdir: %global _udevrulesdir %{_prefix}/lib/udev/rules.d}
 
 Name:           skillkorp-m20
-Version:        1.1.0
+Version:        1.1.1
 Release:        1%{?dist}
 Summary:        Pilote et interface graphique Linux pour souris SkillKorp M20 Ultimate
 License:        MIT
@@ -73,6 +73,10 @@ update-desktop-database %{_datadir}/applications >/dev/null 2>&1 || :
 %{_datadir}/icons/hicolor/256x256/apps/skillkorp-m20.png
 
 %changelog
+* Sun Sep 20 2026 nplacide <nplacide95@gmail.com> - 1.1.1-1
+- Correction IndexError dans m20_gui.py lors de la restauration d'usine des boutons
+- Affichage de l'attribution du bouton 6 dans m20ctl button
+- Harmonisation du fallback par défaut du bouton 6 dans m20_gui.py (_sync_ui_from_current_profile)
 * Sat Sep 20 2026 nplacide <nplacide95@gmail.com> - 1.1.0-1
 - Correctifs critiques: move_to_wake, apply_all RGB, clamp active_stage
 - Bouton 6 (DPI Cycle) accessible depuis GUI et CLI

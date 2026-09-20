@@ -628,7 +628,7 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
     def _on_restore_buttons_clicked(self, widget):
         try:
             self.driver.restore_factory_buttons()
-            default_keys = ["left_click", "right_click", "middle_click", "forward", "backward"]
+            default_keys = ["left_click", "right_click", "middle_click", "forward", "backward", "dpi_cycle"]
             for i, combo in enumerate(self.btn_combos):
                 def_key = default_keys[i]
                 if def_key in self.btn_action_keys:
@@ -683,8 +683,9 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
 
             # 3. Buttons
             buttons = prof.get("buttons", {})
+            default_actions = ["left_click", "right_click", "middle_click", "forward", "backward", "dpi_cycle"]
             for i, combo in enumerate(self.btn_combos):
-                act = buttons.get(str(i + 1), "left_click" if i == 0 else "right_click" if i == 1 else "middle_click" if i == 2 else "forward" if i == 3 else "backward")
+                act = buttons.get(str(i + 1), default_actions[i])
                 if act in self.btn_action_keys:
                     combo.set_selected(self.btn_action_keys.index(act))
 

@@ -14,7 +14,7 @@ import time
 
 REPO_DIR = os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__))))
 DIST_DIR = os.path.join(REPO_DIR, "dist")
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 RELEASE = "1"
 PKG_NAME = "skillkorp-m20"
 

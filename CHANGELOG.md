@@ -5,6 +5,16 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ---
 
+## [1.1.1] — 2026-09-20
+
+### Correctifs & Améliorations (extension bouton 6)
+
+- **`m20_gui.py` (`_on_restore_buttons_clicked`)** : correction d'un `IndexError` sur `default_keys[5]` lors du clic sur "Restaurer par Défaut". La liste `default_keys` ne contenait que 5 entrées alors que l'interface comporte 6 rangées de boutons depuis la version 1.1.0 (`"dpi_cycle"` ajouté).
+- **`m20ctl` (`cmd_button`)** : passage de `range(1, 6)` à `range(1, 7)` dans l'affichage par défaut de `m20ctl button` (sans arguments) pour afficher l'attribution actuelle du bouton 6 (DPI Cycle).
+- **`m20_gui.py` (`_sync_ui_from_current_profile`)** : remplacement de la chaîne conditionnelle par la liste `default_actions = ["left_click", "right_click", "middle_click", "forward", "backward", "dpi_cycle"]`, assurant que le bouton 6 retombe bien sur `"dpi_cycle"` si sa clé est absente d'un profil importé.
+
+---
+
 ## [1.1.0] — 2026-09-20
 
 ### Bugs critiques corrigés
