@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=SkillKorp M20 Ultimate
+GenericName=Gestionnaire de Souris Gaming
+Comment=Pilote et configuration de la souris SkillKorp M20 Ultimate sous Linux
+Exec=m20-gui
+Icon=skillkorp-m20
+Terminal=false
+Type=Application
+Categories=Settings;HardwareSettings;Utility;
+Keywords=mouse;souris;skillkorp;m20;dpi;gaming;
+StartupNotify=true

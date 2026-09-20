@@ -1,0 +1,230 @@
+#!/usr/bin/env python3
+"""
+m20ctl - SkillKorp M20 Ultimate Command Line Controller
+"""
+
+import sys
+import os
+import select
+import argparse
+
+# Add package directory to path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from m20_driver import SkillkorpM20Driver, BUTTON_ACTIONS, POLLING_RATE_MAP
+
+
+def cmd_status(driver: SkillkorpM20Driver, args):
+    status = driver.query_status(poll_hardware=True)
+    print("========================================")
+    print("       SKILLKORP M20 ULTIMATE           ")
+    print("========================================")
+    conn_str = "\033[92mConnectée\033[0m" if status["connected"] else "\033[91mDéconnectée\033[0m"
+    print(f"Statut        : {conn_str} ({status['device'] or 'N/A'})")
+
+    charge_str = " (En charge ⚡)" if status["charging"] else ""
+    bat_color = "\033[92m" if status["battery"] > 20 else "\033[91m"
+    print(f"Batterie      : {bat_color}{status['battery']}%\033[0m{charge_str}")
+
+    print(f"Taux de poll  : {status['polling_rate_hz']} Hz")
+    print(f"DPI Actif     : \033[96m{status['active_dpi']} DPI\033[0m (Étape {status['active_stage']}/{len(status['stages'])})")
+    stages_str = ", ".join(f"[{s}]" if i+1 == status['active_stage'] else str(s) for i, s in enumerate(status['stages']))
+    print(f"Étapes DPI    : {stages_str}")
+    print(f"Distance LOD  : {status['lod_mm']} mm")
+    print(f"Debounce      : {status['debounce_ms']} ms")
+    print(f"Motion Sync   : {'Activé' if status['motion_sync'] else 'Désactivé'}")
+    print(f"Angle Snap    : {'Activé' if status['angle_snapping'] else 'Désactivé'}")
+    print(f"Ripple Control: {'Activé' if status['ripple_control'] else 'Désactivé'}")
+    print("========================================")
+
+
+def cmd_dpi(driver: SkillkorpM20Driver, args):
+    stages = None
+    if args.stages:
+        stages = [int(s.strip()) for s in args.stages.split(",")]
+    active = args.active
+
+    if stages is None and active is None:
+        status = driver.query_status()
+        print(f"DPI Actif: {status['active_dpi']} (Étape {status['active_stage']})")
+        print(f"Étapes   : {status['stages']}")
+        return
+
+    driver.set_dpi_and_sensor(stages=stages, active_stage=active)
+    new_status = driver.query_status()
+    print(f"✓ DPI mis à jour : {new_status['active_dpi']} DPI (Étape {new_status['active_stage']})")
+    print(f"  Étapes configurées : {new_status['stages']}")
+
+
+def cmd_rate(driver: SkillkorpM20Driver, args):
+    if args.set:
+        driver.set_polling_rate(args.set)
+        print(f"✓ Taux de scrutation configuré à {args.set} Hz.")
+    else:
+        status = driver.query_status()
+        print(f"Taux de scrutation actuel : {status['polling_rate_hz']} Hz")
+
+
+def cmd_sensor(driver: SkillkorpM20Driver, args):
+    kwargs = {}
+    if args.lod is not None:
+        kwargs["lod"] = args.lod
+    if args.debounce is not None:
+        kwargs["debounce"] = args.debounce
+    if args.motion_sync is not None:
+        kwargs["motion_sync"] = (args.motion_sync.lower() in ["on", "1", "true", "oui"])
+    if args.angle_snap is not None:
+        kwargs["angle_snap"] = (args.angle_snap.lower() in ["on", "1", "true", "oui"])
+    if args.ripple is not None:
+        kwargs["ripple"] = (args.ripple.lower() in ["on", "1", "true", "oui"])
+
+    if not kwargs:
+        st = driver.query_status()
+        print(f"Distance de levée (LOD) : {st['lod_mm']} mm")
+        print(f"Temps de réponse touches : {st['debounce_ms']} ms")
+        print(f"Motion Sync              : {st['motion_sync']}")
+        print(f"Angle Snapping           : {st['angle_snapping']}")
+        print(f"Ripple Control           : {st['ripple_control']}")
+        return
+
+    driver.set_dpi_and_sensor(**kwargs)
+    st = driver.query_status()
+    print("✓ Paramètres capteur mis à jour :")
+    print(f"  LOD: {st['lod_mm']}mm | Debounce: {st['debounce_ms']}ms | MotionSync: {st['motion_sync']} | AngleSnap: {st['angle_snapping']} | Ripple: {st['ripple_control']}")
+
+
+def cmd_button(driver: SkillkorpM20Driver, args):
+    if args.list_actions:
+        print("Actions configurables disponibles :")
+        for key, info in BUTTON_ACTIONS.items():
+            print(f"  {key:<20} : {info[0]}")
+        return
+
+    if args.btn and args.action:
+        if args.action not in BUTTON_ACTIONS:
+            print(f"Erreur: action '{args.action}' inconnue. Utilisez 'm20ctl button --list-actions'.")
+            sys.exit(1)
+        driver.set_buttons({args.btn: args.action})
+        print(f"✓ Bouton {args.btn} réassigné à '{BUTTON_ACTIONS[args.action][0]}'")
+    else:
+        buttons = driver.config.get("buttons", {})
+        print("Affectation actuelle des boutons :")
+        for b in range(1, 7):
+            act = buttons.get(str(b), "inconnu")
+            desc = BUTTON_ACTIONS.get(act, (act,))[0]
+            print(f"  Bouton {b}: {desc} ({act})")
+
+
+def cmd_restore_buttons(driver: SkillkorpM20Driver, args):
+    driver.restore_factory_buttons()
+    print("✓ Mappage d'usine des boutons restauré (clic gauche, clic droit, molette, défilement et latéraux).")
+
+
+def cmd_monitor(driver: SkillkorpM20Driver, args):
+    if not driver.is_connected():
+        print("Souris SkillKorp M20 non connectée.")
+        return
+    print("========================================", flush=True)
+    print("       ÉCOUTE EN DIRECT DES ÉVÉNEMENTS  ", flush=True)
+    print("========================================", flush=True)
+    print("Appuyez sur le bouton physique DPI de la souris pour tester le changement.", flush=True)
+    print("Appuyez sur Ctrl+C pour quitter.\n", flush=True)
+
+    fd = os.open(driver.dev_path, os.O_RDONLY | os.O_NONBLOCK)
+    try:
+        while True:
+            r, _, _ = select.select([fd], [], [], 1.0)
+            if r:
+                try:
+                    data = os.read(fd, 64)
+                    if len(data) >= 5 and data[0] == 0x03:
+                        w_param = data[1] | (data[2] << 8)
+                        if (w_param & 0xFF00) in (0x1000, 0x2000):
+                            stage = data[3]
+                            stages = driver.config.get("dpi_stages", [400, 800, 1600, 3200, 6400, 26000])
+                            dpi_val = stages[stage - 1] if 1 <= stage <= len(stages) else "inconnu"
+                            driver.config["active_stage"] = stage
+                            driver._save_config()
+                            print(f"⚡ Bouton DPI pressé -> \033[92mÉtape {stage}/{len(stages)}\033[0m : \033[96m{dpi_val} DPI\033[0m", flush=True)
+                        elif w_param & 0xFF00 == 0x4000:
+                            bat = data[4]
+                            charging = (data[3] == 2)
+                            ch = " (en charge ⚡)" if charging else ""
+                            print(f"🔋 Batterie : {bat}%{ch}", flush=True)
+                except BlockingIOError:
+                    pass
+    except KeyboardInterrupt:
+        print("\nArrêt de l'écoute.", flush=True)
+    finally:
+        os.close(fd)
+
+
+def cmd_apply(driver: SkillkorpM20Driver, args):
+    print("Application de tous les paramètres enregistrés vers la souris...")
+    success = driver.apply_all()
+    if success:
+        print("✓ Tous les paramètres ont été appliqués avec succès.")
+    else:
+        print("✗ Erreur lors de l'envoi de certains paramètres.")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Gestionnaire Linux pour souris SkillKorp M20 Ultimate")
+    subparsers = parser.add_subparsers(dest="command", help="Commandes")
+
+    # status
+    p_status = subparsers.add_parser("status", help="Afficher l'état de la souris et de la batterie")
+    p_status.set_defaults(func=cmd_status)
+
+    # dpi
+    p_dpi = subparsers.add_parser("dpi", help="Configurer les étapes DPI")
+    p_dpi.add_argument("--stages", type=str, help="Liste des DPI séparés par virgule (ex: 400,800,1600,3200)")
+    p_dpi.add_argument("--active", type=int, help="Numéro d'étape DPI active (1 à 8)")
+    p_dpi.set_defaults(func=cmd_dpi)
+
+    # rate
+    p_rate = subparsers.add_parser("rate", help="Taux de scrutation (polling rate)")
+    p_rate.add_argument("--set", type=int, choices=[125, 250, 500, 1000], help="Fréquence en Hz")
+    p_rate.set_defaults(func=cmd_rate)
+
+    # sensor
+    p_sensor = subparsers.add_parser("sensor", help="Paramètres avancés du capteur PixArt PAW3395")
+    p_sensor.add_argument("--lod", type=int, choices=[1, 2], help="Distance de levée (1 ou 2 mm)")
+    p_sensor.add_argument("--debounce", type=int, help="Temps de réponse touches en ms (0 à 20)")
+    p_sensor.add_argument("--motion-sync", type=str, choices=["on", "off"], help="Motion Sync")
+    p_sensor.add_argument("--angle-snap", type=str, choices=["on", "off"], help="Correction en ligne droite")
+    p_sensor.add_argument("--ripple", type=str, choices=["on", "off"], help="Contrôle des ondulations")
+    p_sensor.set_defaults(func=cmd_sensor)
+
+    # button
+    p_button = subparsers.add_parser("button", help="Configuration des boutons")
+    p_button.add_argument("--btn", type=int, choices=range(1, 7), help="Numéro du bouton (1 à 6)")
+    p_button.add_argument("--action", type=str, help="Nom de l'action à assigner")
+    p_button.add_argument("--list-actions", action="store_true", help="Lister les actions disponibles")
+    p_button.set_defaults(func=cmd_button)
+
+    # restore-buttons
+    p_res_btn = subparsers.add_parser("restore-buttons", help="Restaurer le mappage par défaut d'usine des boutons")
+    p_res_btn.set_defaults(func=cmd_restore_buttons)
+
+    # monitor
+    p_mon = subparsers.add_parser("monitor", help="Écouter en direct les changements de DPI et état batterie")
+    p_mon.set_defaults(func=cmd_monitor)
+
+    # apply
+    p_apply = subparsers.add_parser("apply", help="Ré-appliquer la configuration enregistrée")
+    p_apply.set_defaults(func=cmd_apply)
+
+    args = parser.parse_args()
+
+    driver = SkillkorpM20Driver()
+    if not driver.is_connected() and args.command != "status":
+        print("\033[93mAttention: La souris SkillKorp M20 ne semble pas connectée sur USB.\033[0m")
+
+    if hasattr(args, "func"):
+        args.func(driver, args)
+    else:
+        cmd_status(driver, args)
+
+
+if __name__ == "__main__":
+    main()

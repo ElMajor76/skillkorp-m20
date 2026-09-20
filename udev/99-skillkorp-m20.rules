@@ -1,0 +1,8 @@
+# udev rules for SkillKorp M20 Ultimate gaming mouse
+# Grants read/write access to normal users without root
+
+# Wireless nano receiver (1d57:fa60)
+KERNEL=="hidraw*", ATTRS{idVendor}=="1d57", ATTRS{idProduct}=="fa60", MODE="0666", TAG+="uaccess"
+
+# USB-C Wired connection (1d57:fa61)
+KERNEL=="hidraw*", ATTRS{idVendor}=="1d57", ATTRS{idProduct}=="fa61", MODE="0666", TAG+="uaccess"
