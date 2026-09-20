@@ -28,11 +28,16 @@ install_system_direct() {
     sudo mkdir -p /usr/share/icons/hicolor/256x256/apps
 
     sudo install -m 0755 "$SCRIPT_DIR/m20_driver.py" /usr/share/skillkorp-m20/m20_driver.py
+    sudo install -m 0755 "$SCRIPT_DIR/profile_manager.py" /usr/share/skillkorp-m20/profile_manager.py
     sudo install -m 0755 "$SCRIPT_DIR/m20_gui.py" /usr/share/skillkorp-m20/m20_gui.py
+    sudo install -m 0755 "$SCRIPT_DIR/m20_tray.py" /usr/share/skillkorp-m20/m20_tray.py
     sudo install -m 0755 "$SCRIPT_DIR/m20ctl" /usr/share/skillkorp-m20/m20ctl
+
+    sudo cp -r "$SCRIPT_DIR/assets" /usr/share/skillkorp-m20/
 
     sudo ln -sf /usr/share/skillkorp-m20/m20ctl /usr/bin/m20ctl
     sudo ln -sf /usr/share/skillkorp-m20/m20_gui.py /usr/bin/m20-gui
+    sudo ln -sf /usr/share/skillkorp-m20/m20_tray.py /usr/bin/m20-tray
 
     sudo install -m 0644 "$SCRIPT_DIR/udev/99-skillkorp-m20.rules" /usr/lib/udev/rules.d/99-skillkorp-m20.rules
     sudo install -m 0644 "$SCRIPT_DIR/io.github.skillkorp.m20.desktop" /usr/share/applications/io.github.skillkorp.m20.desktop
@@ -51,6 +56,7 @@ install_user_mode() {
 
     ln -sf "$SCRIPT_DIR/m20ctl" "$HOME/.local/bin/m20ctl"
     ln -sf "$SCRIPT_DIR/m20_gui.py" "$HOME/.local/bin/m20-gui"
+    ln -sf "$SCRIPT_DIR/m20_tray.py" "$HOME/.local/bin/m20-tray"
     cp -f "$SCRIPT_DIR/assets/skillkorp-m20.png" "$HOME/.local/share/icons/hicolor/256x256/apps/skillkorp-m20.png"
     cp -f "$SCRIPT_DIR/io.github.skillkorp.m20.desktop" "$HOME/.local/share/applications/"
     update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
@@ -82,15 +88,16 @@ uninstall() {
 
     # Clean system files
     sudo rm -rf /usr/share/skillkorp-m20
-    sudo rm -f /usr/bin/m20ctl /usr/bin/m20-gui
+    sudo rm -f /usr/bin/m20ctl /usr/bin/m20-gui /usr/bin/m20-tray
     sudo rm -f /usr/lib/udev/rules.d/99-skillkorp-m20.rules /etc/udev/rules.d/99-skillkorp-m20.rules
     sudo rm -f /usr/share/applications/io.github.skillkorp.m20.desktop
     sudo rm -f /usr/share/icons/hicolor/256x256/apps/skillkorp-m20.png
 
     # Clean user files
-    rm -f "$HOME/.local/bin/m20ctl" "$HOME/.local/bin/m20-gui"
+    rm -f "$HOME/.local/bin/m20ctl" "$HOME/.local/bin/m20-gui" "$HOME/.local/bin/m20-tray"
     rm -f "$HOME/.local/share/applications/io.github.skillkorp.m20.desktop"
     rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/skillkorp-m20.png"
+    rm -f "$HOME/.config/autostart/io.github.skillkorp.m20.tray.desktop"
 
     sudo udevadm control --reload-rules 2>/dev/null || true
     echo "✓ Désinstallation terminée."

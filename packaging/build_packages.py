@@ -87,16 +87,22 @@ def build_deb():
 
     # Copy files
     shutil.copy2(os.path.join(REPO_DIR, "m20_driver.py"), os.path.join(share_dir, "m20_driver.py"))
+    shutil.copy2(os.path.join(REPO_DIR, "profile_manager.py"), os.path.join(share_dir, "profile_manager.py"))
     shutil.copy2(os.path.join(REPO_DIR, "m20_gui.py"), os.path.join(share_dir, "m20_gui.py"))
+    shutil.copy2(os.path.join(REPO_DIR, "m20_tray.py"), os.path.join(share_dir, "m20_tray.py"))
     shutil.copy2(os.path.join(REPO_DIR, "m20ctl"), os.path.join(share_dir, "m20ctl"))
+    shutil.copytree(os.path.join(REPO_DIR, "assets"), os.path.join(share_dir, "assets"), dirs_exist_ok=True)
 
     os.chmod(os.path.join(share_dir, "m20_driver.py"), 0o755)
+    os.chmod(os.path.join(share_dir, "profile_manager.py"), 0o755)
     os.chmod(os.path.join(share_dir, "m20_gui.py"), 0o755)
+    os.chmod(os.path.join(share_dir, "m20_tray.py"), 0o755)
     os.chmod(os.path.join(share_dir, "m20ctl"), 0o755)
 
     # Symlinks
     os.symlink(f"/usr/share/{PKG_NAME}/m20ctl", os.path.join(bin_dir, "m20ctl"))
     os.symlink(f"/usr/share/{PKG_NAME}/m20_gui.py", os.path.join(bin_dir, "m20-gui"))
+    os.symlink(f"/usr/share/{PKG_NAME}/m20_tray.py", os.path.join(bin_dir, "m20-tray"))
 
     # Udev, desktop, icon, docs
     shutil.copy2(os.path.join(REPO_DIR, "udev", "99-skillkorp-m20.rules"), os.path.join(udev_dir, "99-skillkorp-m20.rules"))
@@ -216,7 +222,9 @@ def build_source_tarball():
     with tarfile.open(tar_path, "w:gz") as tar:
         for f in [
             "m20_driver.py",
+            "profile_manager.py",
             "m20_gui.py",
+            "m20_tray.py",
             "m20ctl",
             "install.sh",
             "LICENSE",

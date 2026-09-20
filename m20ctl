@@ -5,16 +5,30 @@ m20ctl - SkillKorp M20 Ultimate Command Line Controller
 
 import sys
 import os
+import time
 import select
 import argparse
+import subprocess
+import signal
 
 # Add package directory to path
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 from m20_driver import SkillkorpM20Driver, BUTTON_ACTIONS, POLLING_RATE_MAP
+from profile_manager import (
+    ProfileManager,
+    detect_active_window_class,
+    is_autostart_enabled,
+    set_autostart,
+)
 
 
 def cmd_status(driver: SkillkorpM20Driver, args):
     status = driver.query_status(poll_hardware=True)
+    pm = ProfileManager()
+    active_prof_id = pm.get_active_profile_id()
+    active_prof = pm.get_profile(active_prof_id)
+    prof_display = f"{active_prof.get('name', active_prof_id)} ({active_prof_id})" if active_prof else active_prof_id
+
     print("========================================")
     print("       SKILLKORP M20 ULTIMATE           ")
     print("========================================")
@@ -25,6 +39,7 @@ def cmd_status(driver: SkillkorpM20Driver, args):
     bat_color = "\033[92m" if status["battery"] > 20 else "\033[91m"
     print(f"Batterie      : {bat_color}{status['battery']}%\033[0m{charge_str}")
 
+    print(f"Profil Actif  : \033[95m{prof_display}\033[0m")
     print(f"Taux de poll  : {status['polling_rate_hz']} Hz")
     print(f"DPI Actif     : \033[96m{status['active_dpi']} DPI\033[0m (Étape {status['active_stage']}/{len(status['stages'])})")
     stages_str = ", ".join(f"[{s}]" if i+1 == status['active_stage'] else str(s) for i, s in enumerate(status['stages']))
@@ -34,6 +49,9 @@ def cmd_status(driver: SkillkorpM20Driver, args):
     print(f"Motion Sync   : {'Activé' if status['motion_sync'] else 'Désactivé'}")
     print(f"Angle Snap    : {'Activé' if status['angle_snapping'] else 'Désactivé'}")
     print(f"Ripple Control: {'Activé' if status['ripple_control'] else 'Désactivé'}")
+    print(f"Mise en veille: {status.get('sleep_timer_minutes', 5)} min")
+    wake_str = "Mouvement (Move to wake)" if status.get("move_to_wake", True) else "Clic requis (Click to wake)"
+    print(f"Mode de réveil: {wake_str}")
     print("========================================")
 
 
@@ -92,6 +110,30 @@ def cmd_sensor(driver: SkillkorpM20Driver, args):
     print(f"  LOD: {st['lod_mm']}mm | Debounce: {st['debounce_ms']}ms | MotionSync: {st['motion_sync']} | AngleSnap: {st['angle_snapping']} | Ripple: {st['ripple_control']}")
 
 
+def cmd_power(driver: SkillkorpM20Driver, args):
+    sleep_min = args.sleep_timer
+    wake_mode = args.wake_mode
+
+    if sleep_min is None and wake_mode is None:
+        st = driver.query_status()
+        s_min = st.get("sleep_timer_minutes", 5)
+        m_wake = st.get("move_to_wake", True)
+        print("Paramètres d'alimentation et veille actuels :")
+        print(f"  Délai de mise en veille : {s_min} minutes")
+        print(f"  Mode de réveil           : {'Mouvement (Move to wake)' if m_wake else 'Clic requis (Click to wake)'}")
+        return
+
+    cur_sleep = driver.config.get("sleep_timer_minutes", 5)
+    cur_wake = driver.config.get("move_to_wake", True)
+
+    new_sleep = sleep_min if sleep_min is not None else cur_sleep
+    new_wake = (wake_mode.lower() == "move") if wake_mode is not None else cur_wake
+
+    driver.set_power_settings(sleep_timer_minutes=new_sleep, move_to_wake=new_wake)
+    print(f"✓ Paramètres d'alimentation mis à jour :")
+    print(f"  Délai de veille: {new_sleep} min | Réveil: {'Mouvement' if new_wake else 'Clic requis'}")
+
+
 def cmd_button(driver: SkillkorpM20Driver, args):
     if args.list_actions:
         print("Actions configurables disponibles :")
@@ -117,6 +159,141 @@ def cmd_button(driver: SkillkorpM20Driver, args):
 def cmd_restore_buttons(driver: SkillkorpM20Driver, args):
     driver.restore_factory_buttons()
     print("✓ Mappage d'usine des boutons restauré (clic gauche, clic droit, molette, défilement et latéraux).")
+
+
+def cmd_profile(driver: SkillkorpM20Driver, args):
+    pm = ProfileManager()
+    action = args.profile_action or "list"
+
+    if action == "list":
+        profiles = pm.list_profiles()
+        print("Profils configurés :")
+        for p in profiles:
+            star = "\033[92m* \033[0m" if p.get("active") else "  "
+            desc = p.get("description", "")
+            print(f"{star}\033[1m{p['id']:<16}\033[0m - {p.get('name', p['id'])} ({desc})")
+        print("\nUtilisez 'm20ctl profile switch <id>' pour activer un profil.")
+
+    elif action == "switch":
+        if not args.id:
+            print("Erreur: Spécifiez l'identifiant du profil. Ex: m20ctl profile switch gaming_fps")
+            sys.exit(1)
+        try:
+            prof = pm.switch_profile(args.id, driver=driver)
+            print(f"✓ Profil activé : \033[92m{prof.get('name', args.id)}\033[0m ({args.id})")
+        except Exception as e:
+            print(f"Erreur: {e}")
+            sys.exit(1)
+
+    elif action == "create":
+        if not args.id:
+            print("Erreur: Spécifiez l'identifiant du profil à créer. Ex: m20ctl profile create my_profile")
+            sys.exit(1)
+        name = args.name or args.id.replace("_", " ").title()
+        prof = pm.create_profile(args.id, name=name, copy_from=args.copy_from)
+        print(f"✓ Profil créé avec succès : {prof.get('name')} (id: {prof.get('id')})")
+
+    elif action == "delete":
+        if not args.id:
+            print("Erreur: Spécifiez l'identifiant du profil à supprimer.")
+            sys.exit(1)
+        try:
+            if pm.delete_profile(args.id):
+                print(f"✓ Profil '{args.id}' supprimé.")
+            else:
+                print(f"Erreur: Profil '{args.id}' introuvable.")
+        except Exception as e:
+            print(f"Erreur: {e}")
+            sys.exit(1)
+
+    elif action == "export":
+        if not args.id or not args.file:
+            print("Erreur: Spécifiez l'id du profil et le chemin cible. Ex: m20ctl profile export gaming_fps ~/gaming.json")
+            sys.exit(1)
+        try:
+            pm.export_profile(args.id, args.file)
+            print(f"✓ Profil '{args.id}' exporté vers {args.file}")
+        except Exception as e:
+            print(f"Erreur: {e}")
+            sys.exit(1)
+
+    elif action == "import":
+        if not args.file:
+            print("Erreur: Spécifiez le fichier à importer. Ex: m20ctl profile import ~/gaming.json")
+            sys.exit(1)
+        try:
+            new_id = pm.import_profile(args.file, new_id=args.id)
+            print(f"✓ Profil importé avec succès sous l'identifiant '{new_id}'.")
+        except Exception as e:
+            print(f"Erreur lors de l'import: {e}")
+            sys.exit(1)
+
+
+def get_tray_pids() -> list:
+    pids = []
+    try:
+        out = subprocess.check_output(["pgrep", "-f", "m20_tray.py"], text=True)
+        my_pid = os.getpid()
+        for line in out.strip().splitlines():
+            try:
+                p = int(line.strip())
+                if p != my_pid:
+                    pids.append(p)
+            except ValueError:
+                pass
+    except subprocess.CalledProcessError:
+        pass
+    return pids
+
+
+def cmd_tray(driver: SkillkorpM20Driver, args):
+    action = args.tray_action or "status"
+    pids = get_tray_pids()
+
+    if action == "start":
+        if pids:
+            print(f"L'indicateur de barre des tâches est déjà en cours d'exécution (PID: {pids[0]}).")
+            return
+        tray_script = os.path.join(os.path.dirname(os.path.realpath(__file__)), "m20_tray.py")
+        cmd = [sys.executable, tray_script] if os.path.exists(tray_script) else ["m20-tray"]
+        subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        time.sleep(0.5)
+        new_pids = get_tray_pids()
+        if new_pids:
+            print(f"✓ Indicateur démarré en arrière-plan (PID: {new_pids[0]}).")
+        else:
+            print("✗ Erreur: Impossible de démarrer l'indicateur.")
+
+    elif action == "stop":
+        if not pids:
+            print("L'indicateur n'est pas en cours d'exécution.")
+            return
+        for p in pids:
+            try:
+                os.kill(p, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        print(f"✓ Indicateur arrêté (PIDs: {pids}).")
+
+    elif action == "status":
+        if pids:
+            print(f"● L'indicateur de barre des tâches est actif (PID: {pids[0]}).")
+        else:
+            print("○ L'indicateur de barre des tâches n'est pas actif.")
+
+
+def cmd_autostart(driver: SkillkorpM20Driver, args):
+    action = args.autostart_action or "status"
+    if action == "enable":
+        set_autostart(True)
+        print("✓ Lancement automatique activé (~/.config/autostart/io.github.skillkorp.m20.tray.desktop).")
+    elif action == "disable":
+        set_autostart(False)
+        print("✓ Lancement automatique désactivé.")
+    elif action == "status":
+        enabled = is_autostart_enabled()
+        status_str = "\033[92mActivé\033[0m" if enabled else "\033[90mDésactivé\033[0m"
+        print(f"Lancement automatique au démarrage : {status_str}")
 
 
 def cmd_monitor(driver: SkillkorpM20Driver, args):
@@ -169,10 +346,10 @@ def cmd_apply(driver: SkillkorpM20Driver, args):
 
 def main():
     parser = argparse.ArgumentParser(description="Gestionnaire Linux pour souris SkillKorp M20 Ultimate")
-    subparsers = parser.add_subparsers(dest="command", help="Commandes")
+    subparsers = parser.add_subparsers(dest="command", help="Commandes disponibles")
 
     # status
-    p_status = subparsers.add_parser("status", help="Afficher l'état de la souris et de la batterie")
+    p_status = subparsers.add_parser("status", help="Afficher l'état complet de la souris et de la batterie")
     p_status.set_defaults(func=cmd_status)
 
     # dpi
@@ -195,6 +372,12 @@ def main():
     p_sensor.add_argument("--ripple", type=str, choices=["on", "off"], help="Contrôle des ondulations")
     p_sensor.set_defaults(func=cmd_sensor)
 
+    # power
+    p_power = subparsers.add_parser("power", help="Paramètres d'alimentation, veille et mode de réveil")
+    p_power.add_argument("--sleep-timer", type=int, choices=range(1, 61), help="Délai de mise en veille en minutes (1 à 60)")
+    p_power.add_argument("--wake-mode", type=str, choices=["move", "click"], help="Mode de réveil : 'move' (mouvement) ou 'click' (clic requis)")
+    p_power.set_defaults(func=cmd_power)
+
     # button
     p_button = subparsers.add_parser("button", help="Configuration des boutons")
     p_button.add_argument("--btn", type=int, choices=range(1, 6), help="Numéro du bouton (1 à 5)")
@@ -205,6 +388,25 @@ def main():
     # restore-buttons
     p_res_btn = subparsers.add_parser("restore-buttons", help="Restaurer le mappage par défaut d'usine des boutons")
     p_res_btn.set_defaults(func=cmd_restore_buttons)
+
+    # profile
+    p_prof = subparsers.add_parser("profile", help="Gestion multi-profils (création, bascule, import/export)")
+    p_prof.add_argument("profile_action", nargs="?", choices=["list", "switch", "create", "delete", "export", "import"], default="list")
+    p_prof.add_argument("id", nargs="?", help="Identifiant du profil (ex: gaming_fps)")
+    p_prof.add_argument("--name", type=str, help="Nom affiché du profil")
+    p_prof.add_argument("--copy-from", type=str, help="Profil source à dupliquer")
+    p_prof.add_argument("--file", type=str, help="Chemin du fichier pour export/import")
+    p_prof.set_defaults(func=cmd_profile)
+
+    # tray
+    p_tray = subparsers.add_parser("tray", help="Gestion de l'indicateur de la zone de notification (systray)")
+    p_tray.add_argument("tray_action", nargs="?", choices=["start", "stop", "status"], default="status")
+    p_tray.set_defaults(func=cmd_tray)
+
+    # autostart
+    p_auto = subparsers.add_parser("autostart", help="Gestion du lancement automatique au démarrage de la session")
+    p_auto.add_argument("autostart_action", nargs="?", choices=["enable", "disable", "status"], default="status")
+    p_auto.set_defaults(func=cmd_autostart)
 
     # monitor
     p_mon = subparsers.add_parser("monitor", help="Écouter en direct les changements de DPI et état batterie")
@@ -217,7 +419,7 @@ def main():
     args = parser.parse_args()
 
     driver = SkillkorpM20Driver()
-    if not driver.is_connected() and args.command != "status":
+    if not driver.is_connected() and args.command not in ("status", "profile", "tray", "autostart"):
         print("\033[93mAttention: La souris SkillKorp M20 ne semble pas connectée sur USB.\033[0m")
 
     if hasattr(args, "func"):

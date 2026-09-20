@@ -3,7 +3,8 @@ Version: 1.0.0
 Section: utils
 Priority: optional
 Architecture: all
-Depends: python3, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, udev
+Depends: python3, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1, udev, gir1.2-notify-0.7
+Recommends: gir1.2-ayatanaappindicator3-0.1 | gir1.2-appindicator3-0.1
 Maintainer: nplacide <nplacide95@gmail.com>
 Homepage: https://github.com/ElMajor76/skillkorp-m20
 Description: Linux driver, CLI, and GUI for SkillKorp M20 Ultimate gaming mouse

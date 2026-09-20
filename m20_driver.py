@@ -261,6 +261,8 @@ class SkillkorpM20Driver:
             "angle_snapping": self.config.get("angle_snap", False),
             "ripple_control": self.config.get("ripple", False),
             "light_mode": self.config.get("light_mode", "static"),
+            "sleep_timer_minutes": self.config.get("sleep_timer_minutes", 5),
+            "move_to_wake": self.config.get("move_to_wake", True),
         }
 
     def set_polling_rate(self, rate_hz: int) -> bool:
@@ -420,6 +422,41 @@ class SkillkorpM20Driver:
             self._save_config()
         return success
 
+    def set_power_settings(
+        self,
+        sleep_timer_minutes: int = 5,
+        move_to_wake: bool = True,
+    ) -> bool:
+        """
+        Configure hardware sleep timer & wake mode via Report ID 0x05.
+        - sleep_timer_minutes: 1 to 60 minutes
+        - move_to_wake: True for Move-to-wake (0x00), False for Click-to-wake (0x01)
+        """
+        sleep_timer_minutes = max(1, min(60, int(sleep_timer_minutes)))
+        buf = bytearray(15)
+        buf[0] = 0x05  # Report ID 5
+        buf[1] = 0x0F  # Length 15
+        buf[2] = 0x01  # Profile index
+        buf[3] = 0x00
+        buf[4] = 0x00
+        buf[5] = 0x00
+        buf[6] = 0x00
+        buf[7] = 0x00
+        buf[8] = 0x00
+        buf[9] = sleep_timer_minutes
+        buf[10] = 0x00 if move_to_wake else 0x01
+
+        csum = (buf[3] + buf[4] + buf[5] + buf[6] + buf[7] + buf[8] + buf[9] + buf[10]) & 0xFFFF
+        buf[11] = (csum >> 8) & 0xFF
+        buf[12] = csum & 0xFF
+
+        success = self._send_feature_report(buf)
+        if success:
+            self.config["sleep_timer_minutes"] = sleep_timer_minutes
+            self.config["move_to_wake"] = move_to_wake
+            self._save_config()
+        return success
+
     def set_buttons(self, button_map: Dict[int, str]) -> bool:
         """
         Remap buttons via Report ID 0x08 with exact hardware slot assignments.
@@ -547,6 +584,8 @@ class SkillkorpM20Driver:
             },
             "battery": 100,
             "charging": False,
+            "sleep_timer_minutes": 5,
+            "move_to_wake": True,
         }
         return default_conf
 
@@ -576,11 +615,9 @@ class SkillkorpM20Driver:
                 colors=self.config.get("dpi_colors"),
             )
             time.sleep(0.05)
-            success &= self.set_rgb_lighting(
-                mode=self.config.get("light_mode", "static"),
-                brightness=self.config.get("brightness", 8),
-                speed=self.config.get("speed", 4),
-                color=tuple(self.config.get("light_color", [255, 0, 0])),
+            success &= self.set_power_settings(
+                sleep_timer_minutes=self.config.get("sleep_timer_minutes", 5),
+                move_to_wake=self.config.get("move_to_wake", True),
             )
             time.sleep(0.05)
             button_map = {int(k): v for k, v in self.config.get("buttons", {}).items()}

@@ -34,12 +34,16 @@ mkdir -p %{buildroot}%{_datadir}/icons/hicolor/256x256/apps
 
 # Fichiers de l'application
 install -m 0755 %{_sourcedir}/m20_driver.py %{buildroot}%{_datadir}/skillkorp-m20/m20_driver.py
+install -m 0755 %{_sourcedir}/profile_manager.py %{buildroot}%{_datadir}/skillkorp-m20/profile_manager.py
 install -m 0755 %{_sourcedir}/m20_gui.py %{buildroot}%{_datadir}/skillkorp-m20/m20_gui.py
+install -m 0755 %{_sourcedir}/m20_tray.py %{buildroot}%{_datadir}/skillkorp-m20/m20_tray.py
 install -m 0755 %{_sourcedir}/m20ctl %{buildroot}%{_datadir}/skillkorp-m20/m20ctl
+cp -r %{_sourcedir}/assets %{buildroot}%{_datadir}/skillkorp-m20/
 
 # Liens symboliques dans /usr/bin
 ln -s %{_datadir}/skillkorp-m20/m20ctl %{buildroot}%{_bindir}/m20ctl
 ln -s %{_datadir}/skillkorp-m20/m20_gui.py %{buildroot}%{_bindir}/m20-gui
+ln -s %{_datadir}/skillkorp-m20/m20_tray.py %{buildroot}%{_bindir}/m20-tray
 
 # Règle udev, lanceur .desktop et icône
 install -m 0644 %{_sourcedir}/udev/99-skillkorp-m20.rules %{buildroot}%{_udevrulesdir}/99-skillkorp-m20.rules
@@ -60,6 +64,7 @@ update-desktop-database %{_datadir}/applications >/dev/null 2>&1 || :
 %{_datadir}/skillkorp-m20
 %{_bindir}/m20ctl
 %{_bindir}/m20-gui
+%{_bindir}/m20-tray
 %{_udevrulesdir}/99-skillkorp-m20.rules
 %{_datadir}/applications/io.github.skillkorp.m20.desktop
 %{_datadir}/icons/hicolor/256x256/apps/skillkorp-m20.png
