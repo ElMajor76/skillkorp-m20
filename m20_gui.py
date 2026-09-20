@@ -28,14 +28,15 @@ from profile_manager import (
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Gtk, Adw, GLib, Gio, Gdk
+from gi.repository import Gtk, Adw, GLib, Gio, Gdk, GObject
 
 
-class SkillkorpM20Window(Adw.PreferencesWindow):
+class SkillkorpM20Window(Adw.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app, title="SkillKorp M20 Ultimate")
         self.set_default_size(980, 760)
         self.set_size_request(800, 640)
+        self.add_css_class("preferences")
 
         self.driver = SkillkorpM20Driver()
         self.pm = ProfileManager()
@@ -58,7 +59,7 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
             background-color: rgba(53, 132, 228, 0.6);
         }
         .button-listbox {
-            min-width: 440px;
+            min-width: 480px;
         }
         """)
         display = Gdk.Display.get_default()
@@ -68,6 +69,32 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
                 css_provider,
                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
             )
+
+        # Main layout structure: ToolbarView with HeaderBar & ViewSwitcherTitle
+        self.toolbar_view = Adw.ToolbarView()
+        self.view_stack = Adw.ViewStack()
+
+        self.view_switcher_title = Adw.ViewSwitcherTitle(
+            stack=self.view_stack,
+            title="SkillKorp M20 Ultimate",
+        )
+        self.header_bar = Adw.HeaderBar(title_widget=self.view_switcher_title)
+        self.toolbar_view.add_top_bar(self.header_bar)
+
+        # Bottom bar for adaptive layout on narrow screens
+        self.switcher_bar = Adw.ViewSwitcherBar(stack=self.view_stack)
+        self.view_switcher_title.bind_property(
+            "title-visible",
+            self.switcher_bar,
+            "reveal",
+            GObject.BindingFlags.SYNC_CREATE,
+        )
+        self.toolbar_view.add_bottom_bar(self.switcher_bar)
+
+        # Toast overlay for in-app notifications
+        self.toast_overlay = Adw.ToastOverlay(child=self.view_stack)
+        self.toolbar_view.set_content(self.toast_overlay)
+        self.set_content(self.toolbar_view)
 
         # Load active profile data
         self.current_profile_id = self.pm.get_active_profile_id()
@@ -84,12 +111,21 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
         # Periodic status refresh (battery, hardware DPI sync)
         GLib.timeout_add_seconds(1, self._periodic_refresh)
 
+    def add_toast(self, toast: Adw.Toast):
+        self.toast_overlay.add_toast(toast)
+
+    def set_visible_page_name(self, name: str):
+        self.view_stack.set_visible_child_name(name)
+
+    def get_visible_page_name(self) -> str:
+        return self.view_stack.get_visible_child_name()
+
     # -------------------------------------------------------------------------
     # 1. PROFILES PAGE
     # -------------------------------------------------------------------------
     def _init_profiles_page(self):
         page = Adw.PreferencesPage(title="Profils", icon_name="document-properties-symbolic")
-        self.add(page)
+        self.view_stack.add_titled_with_icon(page, "profiles", "Profils", "document-properties-symbolic")
 
         # Active Profile Selection Group
         prof_group = Adw.PreferencesGroup(
@@ -284,7 +320,7 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
     # -------------------------------------------------------------------------
     def _init_dpi_page(self):
         page = Adw.PreferencesPage(title="DPI et Capteur", icon_name="input-mouse-symbolic")
-        self.add(page)
+        self.view_stack.add_titled_with_icon(page, "dpi", "DPI et Capteur", "input-mouse-symbolic")
 
         # Group: DPI Stages
         dpi_group = Adw.PreferencesGroup(title="Étapes de Sensibilité (DPI)", description="Capteur PixArt PAW3395 (50 à 26 000 DPI)")
@@ -368,25 +404,28 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
     # 3. BUTTONS PAGE (WITH VECTOR MOUSE SCHEMATIC)
     # -------------------------------------------------------------------------
     def _init_buttons_page(self):
-        page = Adw.PreferencesPage(title="Boutons", icon_name="input-gaming-symbolic")
-        self.add(page)
+        # Robustesse architecturale : La page Boutons est construite dans un Gtk.ScrolledWindow
+        # indépendant ajouté au ViewStack, évitant le clamp fixe à 600px d'Adw.PreferencesPage
+        # sans jamais manipuler l'arborescence interne privée de widgets. De plus, chaque action
+        # utilise un Adw.ActionRow combiné à un Gtk.DropDown public, garantissant un affichage
+        # complet sans limitation arbitraire de caractères (max_width_chars) ni inspection interne.
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        self.view_stack.add_titled_with_icon(scrolled, "buttons", "Boutons", "input-gaming-symbolic")
 
-        # Allow the Buttons page to expand horizontally beyond the default 600px clamp
-        scrolled = page.get_first_child()
-        if scrolled and hasattr(scrolled, "get_child"):
-            viewport = scrolled.get_child()
-            if viewport and hasattr(viewport, "get_child"):
-                clamp = viewport.get_child()
-                if isinstance(clamp, Adw.Clamp):
-                    clamp.set_maximum_size(1040)
-                    clamp.set_tightening_threshold(860)
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
+        content_box.set_margin_start(24)
+        content_box.set_margin_end(24)
+        content_box.set_margin_top(16)
+        content_box.set_margin_bottom(24)
+        content_box.set_halign(Gtk.Align.CENTER)
 
         # Main Layout: Schematic and Configuration
         main_group = Adw.PreferencesGroup(
             title="Attribution Visuelle des Boutons",
             description="Cliquez sur un bouton du schéma ou sélectionnez une action dans la liste",
         )
-        page.add(main_group)
+        content_box.append(main_group)
 
         # Container box
         hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=24)
@@ -485,41 +524,48 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
         schematic_card.append(pill_box)
         hbox.append(schematic_card)
 
-        # Right: The 6 Buttons ComboRows
+        # Right: The 6 Buttons ActionRows with Gtk.DropDown
         btn_rows_box = Gtk.ListBox()
         btn_rows_box.add_css_class("boxed-list")
         btn_rows_box.add_css_class("button-listbox")
         btn_rows_box.set_selection_mode(Gtk.SelectionMode.NONE)
-        btn_rows_box.set_size_request(440, -1)
+        btn_rows_box.set_size_request(480, -1)
         btn_rows_box.set_hexpand(True)
         btn_rows_box.set_valign(Gtk.Align.CENTER)
 
-        self.btn_combos = []
+        self.btn_rows = []
+        self.btn_dropdowns = []
         for i in range(1, 7):
-            row = Adw.ComboRow(title=button_names[i - 1])
-            if hasattr(row, "set_title_lines"):
-                row.set_title_lines(1)
+            row = Adw.ActionRow(title=button_names[i - 1])
+            row.set_title_lines(1)
             row.set_tooltip_text(button_tooltips[i - 1])
-            string_list = Gtk.StringList.new(btn_action_labels)
-            row.set_model(string_list)
+
+            dd = Gtk.DropDown.new_from_strings(btn_action_labels)
+            dd.set_valign(Gtk.Align.CENTER)
+            dd.set_enable_search(True)
 
             cur_act = current_buttons.get(str(i), default_actions[i - 1])
             try:
                 selected_idx = self.btn_action_keys.index(cur_act)
             except ValueError:
                 selected_idx = 0
-            row.set_selected(selected_idx)
-            row.connect("map", lambda r: self._expand_combo_row_labels(r, 45))
-            row.connect("notify::selected", lambda r, p: GLib.idle_add(self._expand_combo_row_labels, r, 45))
-            self.btn_combos.append(row)
+            dd.set_selected(selected_idx)
+
+            row.add_suffix(dd)
+            row.set_activatable_widget(dd)
+
+            self.btn_rows.append(row)
+            self.btn_dropdowns.append(dd)
             btn_rows_box.append(row)
+
+        self.btn_combos = self.btn_dropdowns
 
         hbox.append(btn_rows_box)
         main_group.add(hbox)
 
         # Action Buttons
         apply_group = Adw.PreferencesGroup()
-        page.add(apply_group)
+        content_box.append(apply_group)
 
         btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
         btn_box.set_halign(Gtk.Align.CENTER)
@@ -540,23 +586,14 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
 
         apply_group.add(btn_box)
 
-    @staticmethod
-    def _expand_combo_row_labels(row: Adw.ComboRow, max_chars: int = 45):
-        def _walk(w):
-            ch = w.get_first_child()
-            while ch:
-                if isinstance(ch, Gtk.Label) and ch.get_max_width_chars() == 20:
-                    ch.set_max_width_chars(max_chars)
-                _walk(ch)
-                ch = ch.get_next_sibling()
-        _walk(row)
+        scrolled.set_child(content_box)
 
     def _on_schematic_btn_clicked(self, widget, btn_num: int):
         idx = btn_num - 1
-        if 0 <= idx < len(self.btn_combos):
-            combo = self.btn_combos[idx]
-            combo.grab_focus()
-            combo.activate()
+        if 0 <= idx < len(self.btn_rows):
+            row = self.btn_rows[idx]
+            row.grab_focus()
+            row.activate()
             self._show_toast(f"Bouton {btn_num} sélectionné")
 
     # -------------------------------------------------------------------------
@@ -564,7 +601,7 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
     # -------------------------------------------------------------------------
     def _init_power_page(self):
         page = Adw.PreferencesPage(title="Alimentation et Veille", icon_name="battery-level-100-charged-symbolic")
-        self.add(page)
+        self.view_stack.add_titled_with_icon(page, "power", "Alimentation et Veille", "battery-level-100-charged-symbolic")
 
         # Battery Group
         bat_group = Adw.PreferencesGroup(title="Batterie et Autonomie")

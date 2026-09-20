@@ -3,6 +3,16 @@
 Toutes les modifications notables sont documentées dans ce fichier.
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [1.2.2] — 2026-09-20
+
+### Robustesse architecturale & API publique (GUI)
+
+- **Suppression du parcours privé de l'arborescence de widgets** : remplacement de l'accès fragile aux enfants internes d'Adwaita (`page.get_first_child().get_child()...`) par une architecture standard `Adw.ApplicationWindow` dotée d'un `Adw.ViewStack` et `Adw.ViewSwitcherTitle`.
+- **Page Boutons indépendante dans un `Gtk.ScrolledWindow`** : la page Boutons est directement construite et ajoutée au `ViewStack` sans `Adw.PreferencesPage` (qui impose un clamp rigide à 600 px). Sa largeur et son agencement sont désormais entièrement contrôlés de manière pérenne et stable, sans hack d'inspection.
+- **Remplacement des `Adw.ComboRow` par `Adw.ActionRow` + `Gtk.DropDown`** : chaque ligne de bouton utilise désormais l'API publique GTK 4 / Libadwaita standard (`Adw.ActionRow` et `Gtk.DropDown` avec recherche intégrée), éliminant définitivement la limitation artificielle à 20 caractères (`max_width_chars=20`) et la méthode d'inspection `_expand_combo_row_labels()`.
+- **Labels d'actions épurés et clairs** : simplification des libellés dans `BUTTON_ACTIONS` (ex: "Poste de Travail", "Fermer (Alt+F4)", "Verrouiller (Win+L)", "Tir Rapide (Rapid Fire)", "Visée Sniper") pour une lisibilité optimale dans les menus et en ligne de commande, sans aucune modification des codes matériels ou clés du dictionnaire.
+- **Préservation intégrale des autres onglets** : les onglets Profils, DPI et Capteur, et Alimentation conservent leur disposition standard `Adw.PreferencesPage` / `Adw.PreferencesGroup` sans aucune régression.
+
 ---
 
 ## [1.2.1] — 2026-09-20

@@ -1,7 +1,7 @@
 %{!?_udevrulesdir: %global _udevrulesdir %{_prefix}/lib/udev/rules.d}
 
 Name:           skillkorp-m20
-Version:        1.2.1
+Version:        1.2.2
 Release:        1%{?dist}
 Summary:        Pilote et interface graphique Linux pour souris SkillKorp M20 Ultimate
 License:        MIT
@@ -73,6 +73,11 @@ update-desktop-database %{_datadir}/applications >/dev/null 2>&1 || :
 %{_datadir}/icons/hicolor/256x256/apps/skillkorp-m20.png
 
 %changelog
+* Sun Sep 20 2026 nplacide <nplacide95@gmail.com> - 1.2.2-1
+- Remplacement du parcours de structure interne par Adw.ApplicationWindow et ViewStack
+- Page Boutons dans un Gtk.ScrolledWindow indépendant sans AdwClamp interne
+- Remplacement des ComboRow par Adw.ActionRow et Gtk.DropDown avec recherche
+- Optimisation des libellés d'actions dans BUTTON_ACTIONS
 * Sun Sep 20 2026 nplacide <nplacide95@gmail.com> - 1.2.1-1
 - Correction de la troncature et du saut de ligne des ComboRow dans l'onglet Boutons
 - Élargissement de la fenêtre par défaut (980x760) et déclampage de la page Adw.PreferencesPage

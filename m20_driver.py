@@ -58,11 +58,11 @@ BUTTON_ACTIONS = {
     # Basic Mouse Actions
     "left_click": ("Clic Gauche", 0x02, 0x00, 0x00),
     "right_click": ("Clic Droit", 0x03, 0x00, 0x00),
-    "middle_click": ("Bouton Central (Molette)", 0x04, 0x00, 0x00),
+    "middle_click": ("Clic Molette", 0x04, 0x00, 0x00),
     "forward": ("Suivant / Avant", 0x06, 0x00, 0x00),
     "backward": ("Précédent / Arrière", 0x05, 0x00, 0x00),
     "double_click": ("Double Clic", 0x07, 0x00, 0x00),
-    "fire_button": ("Bouton de Tir (Rapid Fire)", 0x08, 0x00, 0x00),
+    "fire_button": ("Tir Rapide (Rapid Fire)", 0x08, 0x00, 0x00),
     "scroll_up": ("Défilement Molette Haut", 0x09, 0x00, 0x00),
     "scroll_down": ("Défilement Molette Bas", 0x0A, 0x00, 0x00),
 
@@ -84,9 +84,9 @@ BUTTON_ACTIONS = {
     # Web Browser
     "browser_home": ("Accueil Navigateur", 0x25, 0x00, 0x00),
     "browser_favorites": ("Favoris (Ctrl+Shift+O)", 0x11, 0x03, 0x12),
-    "browser_forward": ("Navigateur Page Suivante", 0x20, 0x00, 0x00),
-    "browser_backward": ("Navigateur Page Précédente", 0x21, 0x00, 0x00),
-    "browser_stop": ("Navigateur Arrêter", 0x22, 0x00, 0x00),
+    "browser_forward": ("Page Suivante", 0x20, 0x00, 0x00),
+    "browser_backward": ("Page Précédente", 0x21, 0x00, 0x00),
+    "browser_stop": ("Arrêter Chargement", 0x22, 0x00, 0x00),
     "browser_refresh": ("Actualiser Page", 0x24, 0x00, 0x00),
     "browser_search": ("Recherche Web", 0x26, 0x00, 0x00),
 
@@ -99,15 +99,15 @@ BUTTON_ACTIONS = {
     "find": ("Rechercher (Ctrl+F)", 0x11, 0x01, 0x09),
     "undo": ("Annuler (Ctrl+Z)", 0x11, 0x01, 0x1D),
     "redo": ("Rétablir (Ctrl+Y)", 0x11, 0x01, 0x1C),
-    "close_window": ("Fermer Fenêtre (Alt+F4)", 0x11, 0x04, 0x3D),
+    "close_window": ("Fermer (Alt+F4)", 0x11, 0x04, 0x3D),
     "show_desktop": ("Afficher Bureau (Win+D)", 0x11, 0x08, 0x07),
-    "lock_pc": ("Verrouiller PC (Win+L)", 0x11, 0x08, 0x0F),
+    "lock_pc": ("Verrouiller (Win+L)", 0x11, 0x08, 0x0F),
     "calculator": ("Calculatrice", 0x1D, 0x00, 0x00),
-    "my_computer": ("Poste de Travail (Fichiers)", 0x23, 0x00, 0x00),
+    "my_computer": ("Poste de Travail", 0x23, 0x00, 0x00),
     "email": ("Messagerie (Email)", 0x1E, 0x00, 0x00),
 
     # Gaming & Special
-    "easy_aim": ("Visée Facile (Sniper)", 0x10, 0x00, 0x03),
+    "easy_aim": ("Visée Sniper", 0x10, 0x00, 0x03),
     "disabled": ("Désactivé", 0x01, 0x00, 0x00),
 }
 
