@@ -6,7 +6,7 @@ SkillKorp M20 Ultimate - Application Graphique Linux (GTK 4 / Libadwaita)
 import sys
 import os
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 from m20_driver import SkillkorpM20Driver, BUTTON_ACTIONS, POLLING_RATE_MAP
 
 import gi

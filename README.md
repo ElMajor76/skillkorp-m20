@@ -71,15 +71,45 @@ m20-gui
 
 ---
 
-## 🚀 Installation
+---
 
-Pour installer les utilitaires, le raccourci applicatif et les règles udev :
+## 🚀 Installation & Paquets
+
+Des paquets natifs et un script d'installation automatique sont disponibles pour les principales distributions :
+
+### Option A : Installation automatique universelle
+Le script détecte automatiquement votre distribution et utilise le gestionnaire approprié :
 
 ```bash
 git clone https://github.com/ElMajor76/skillkorp-m20.git
 cd skillkorp-m20
 ./install.sh
 ```
+
+### Option B : Paquet RPM (Fedora, RHEL, openSUSE)
+```bash
+# Générer ou télécharger le paquet RPM
+sudo dnf install dist/skillkorp-m20-*.rpm
+```
+
+### Option C : Paquet DEB (Debian, Ubuntu, Linux Mint, Pop!_OS)
+```bash
+# Générer ou télécharger le paquet DEB
+sudo apt install ./dist/skillkorp-m20_*_all.deb
+```
+
+### Option D : Arch Linux / Manjaro (PKGBUILD)
+```bash
+cd packaging/arch
+makepkg -si
+```
+
+### Génération des paquets (`.rpm`, `.deb`, source)
+Pour régénérer les paquets depuis les sources :
+```bash
+./packaging/build_packages.py
+```
+Les fichiers générés se trouvent dans le répertoire `dist/`.
 
 ---
 

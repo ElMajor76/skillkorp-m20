@@ -9,3 +9,6 @@ venv/
 .idea/
 .vscode/
 *.swp
+dist/
+build_rpm/
+build_deb/
