@@ -5,6 +5,7 @@ SkillKorp M20 Ultimate - Application Graphique Linux (GTK 4 / Libadwaita)
 
 import sys
 import os
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
 from m20_driver import SkillkorpM20Driver, BUTTON_ACTIONS, POLLING_RATE_MAP
@@ -139,29 +140,28 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
         page = Adw.PreferencesPage(title="Boutons", icon_name="input-gaming-symbolic")
         self.add(page)
 
-        btn_group = Adw.PreferencesGroup(title="Attribution des Boutons", description="Configurer les 6 boutons physiques de la souris")
+        btn_group = Adw.PreferencesGroup(title="Attribution des Boutons", description="Configurer les 5 boutons physiques de la souris")
         page.add(btn_group)
 
         self.btn_action_keys = list(BUTTON_ACTIONS.keys())
         btn_action_labels = [info[0] for info in BUTTON_ACTIONS.values()]
-        string_list = Gtk.StringList.new(btn_action_labels)
 
         self.btn_combos = []
         button_names = [
             "Bouton 1 : Clic Gauche",
             "Bouton 2 : Clic Droit",
             "Bouton 3 : Molette (Bouton Central)",
-            "Bouton 4 : Suivant / Avant",
-            "Bouton 5 : Précédent / Arrière",
-            "Bouton 6 : Bouton DPI",
+            "Bouton 4 : Suivant (Latéral Avant)",
+            "Bouton 5 : Précédent (Latéral Arrière)",
         ]
         current_buttons = self.driver.config.get("buttons", {})
 
-        for i in range(1, 7):
+        for i in range(1, 6):
             row = Adw.ComboRow(title=button_names[i - 1])
+            string_list = Gtk.StringList.new(btn_action_labels)
             row.set_model(string_list)
 
-            cur_act = current_buttons.get(str(i), "left_click" if i == 1 else "right_click" if i == 2 else "middle_click" if i == 3 else "forward" if i == 4 else "backward" if i == 5 else "dpi_cycle")
+            cur_act = current_buttons.get(str(i), "left_click" if i == 1 else "right_click" if i == 2 else "middle_click" if i == 3 else "forward" if i == 4 else "backward")
             try:
                 selected_idx = self.btn_action_keys.index(cur_act)
             except ValueError:
@@ -195,7 +195,7 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
         self.add(page)
 
         # Battery Group
-        bat_group = Adw.PreferencesGroup(title="État de la Batterie & Veille")
+        bat_group = Adw.PreferencesGroup(title="État de la Batterie et Veille")
         page.add(bat_group)
 
         self.battery_row = Adw.ActionRow(title="Batterie restante", subtitle="100% (Chargée)")
@@ -257,6 +257,7 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
                 angle_snap=angle,
                 ripple=ripple,
             )
+            time.sleep(0.05)
 
             # 2. Buttons
             btn_map = {}
@@ -265,8 +266,9 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
                 act_key = self.btn_action_keys[action_idx]
                 btn_map[i + 1] = act_key
             self.driver.set_buttons(btn_map)
+            time.sleep(0.05)
 
-            # 4. Polling Rate
+            # 3. Polling Rate
             rate_idx = self.rate_row.get_selected()
             rate_hz = [125, 250, 500, 1000][rate_idx]
             self.driver.set_polling_rate(rate_hz)
@@ -278,7 +280,7 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
     def _on_restore_buttons_clicked(self, widget):
         try:
             self.driver.restore_factory_buttons()
-            default_keys = ["left_click", "right_click", "middle_click", "forward", "backward", "dpi_cycle"]
+            default_keys = ["left_click", "right_click", "middle_click", "forward", "backward"]
             for i, combo in enumerate(self.btn_combos):
                 def_key = default_keys[i]
                 if def_key in self.btn_action_keys:

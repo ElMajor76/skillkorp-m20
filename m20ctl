@@ -108,7 +108,7 @@ def cmd_button(driver: SkillkorpM20Driver, args):
     else:
         buttons = driver.config.get("buttons", {})
         print("Affectation actuelle des boutons :")
-        for b in range(1, 7):
+        for b in range(1, 6):
             act = buttons.get(str(b), "inconnu")
             desc = BUTTON_ACTIONS.get(act, (act,))[0]
             print(f"  Bouton {b}: {desc} ({act})")
@@ -197,7 +197,7 @@ def main():
 
     # button
     p_button = subparsers.add_parser("button", help="Configuration des boutons")
-    p_button.add_argument("--btn", type=int, choices=range(1, 7), help="Numéro du bouton (1 à 6)")
+    p_button.add_argument("--btn", type=int, choices=range(1, 6), help="Numéro du bouton (1 à 5)")
     p_button.add_argument("--action", type=str, help="Nom de l'action à assigner")
     p_button.add_argument("--list-actions", action="store_true", help="Lister les actions disponibles")
     p_button.set_defaults(func=cmd_button)

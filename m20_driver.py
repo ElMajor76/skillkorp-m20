@@ -138,7 +138,7 @@ class SkillkorpM20Driver:
             self.dev_path = self.find_device()
         return bool(self.dev_path and os.path.exists(self.dev_path))
 
-    def _send_feature_report(self, report_bytes: bytearray, retries: int = 2) -> bool:
+    def _send_feature_report(self, report_bytes: bytearray, retries: int = 3) -> bool:
         """Send a feature report via HIDIOCSFEATURE ioctl."""
         if not self.is_connected():
             raise IOError("Souris SkillKorp M20 non connectée.")
@@ -147,11 +147,14 @@ class SkillkorpM20Driver:
         try:
             cmd = _HIDIOCSFEATURE(len(report_bytes))
             for i in range(retries):
-                res = fcntl.ioctl(fd, cmd, report_bytes, True)
-                if res == len(report_bytes):
-                    return True
+                try:
+                    res = fcntl.ioctl(fd, cmd, report_bytes, True)
+                    if res == len(report_bytes):
+                        return True
+                except (BrokenPipeError, OSError):
+                    pass
                 if retries > 1 and i < retries - 1:
-                    time.sleep(0.05)
+                    time.sleep(0.08)
             return False
         finally:
             os.close(fd)
@@ -399,9 +402,8 @@ class SkillkorpM20Driver:
         5: Backward / Précédent (Slot 7)
         6: DPI Cycle (Slot 3)
         """
-        # Safety check: at least one button must be left click
-        has_left = False
-        default_map = {
+        # Normalize all button maps to integer keys to avoid type overwrite bugs
+        merged_map: Dict[int, str] = {
             1: "left_click",
             2: "right_click",
             3: "middle_click",
@@ -409,12 +411,13 @@ class SkillkorpM20Driver:
             5: "backward",
             6: "dpi_cycle",
         }
-        merged_map = {**default_map, **self.config.get("buttons", {}), **button_map}
+        for k, v in self.config.get("buttons", {}).items():
+            merged_map[int(k)] = v
+        for k, v in button_map.items():
+            merged_map[int(k)] = v
 
-        for btn, act in merged_map.items():
-            if act == "left_click":
-                has_left = True
-                break
+        # Safety check: at least one button must be left click
+        has_left = any(act == "left_click" for act in merged_map.values())
         if not has_left:
             raise ValueError("Sécurité: Au moins un bouton doit être configuré en 'Clic Gauche'.")
 
@@ -455,7 +458,7 @@ class SkillkorpM20Driver:
 
         success = self._send_feature_report(buf)
         if success:
-            self.config["buttons"] = {str(k): v for k, v in merged_map.items()}
+            self.config["buttons"] = {str(k): v for k, v in sorted(merged_map.items())}
             self._save_config()
         return success
 
