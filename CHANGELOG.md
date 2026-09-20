@@ -3,6 +3,18 @@
 Toutes les modifications notables sont documentées dans ce fichier.
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
+## [1.3.0] — 2026-09-20
+
+### Synchronisation temps réel multi-processus (Tray, GUI & CLI)
+
+- **Rechargement conditionnel par timestamp (`mtime`)** : implémentation de `reload_config_if_changed()` dans `SkillkorpM20Driver`, permettant à chaque instance (tray, GUI, CLI) de détecter immédiatement les modifications externes du fichier de configuration via un appel système `os.path.getmtime()` ultra-léger (<5 µs) sans surcharge CPU ni parsing JSON inutile.
+- **Élimination des écrasements de configuration périmée** : synchronisation préalable systématique dans toutes les méthodes de configuration partielle (`set_polling_rate`, `set_dpi_and_sensor`, `set_rgb_lighting`, `set_power_settings`, `set_buttons`, `apply_all`), empêchant qu'un processus n'écrase les réglages enregistrés par un autre.
+- **Optimisation des écritures disque dans `query_status`** : enregistrement de la batterie et de l'étape active conditionné à un changement réel de valeur, éliminant les écritures superflues et les invalidations de timestamp à chaque cycle de polling périodique (1s pour la GUI, 2s pour le Tray).
+- **Synchronisation de la GUI avec protection de la saisie utilisateur** : détection dans la boucle périodique de `m20_gui.py` des changements de profil actif initiés depuis le Tray ou le CLI (`pm.get_active_profile_id()`), avec synchronisation des contrôles réservée aux changements de profil effectifs pour ne jamais réinitialiser les réglages en cours de modification par l'utilisateur.
+- **Suite de tests unitaires dédiée** : ajout de `TestReloadConfigIfChanged` dans `tests/test_driver.py` couvrant le rechargement sur modification disque, l'absence de rechargement si fichier inchangé, la résilience si fichier absent, et la prise en compte transparente dans `query_status()`.
+
+---
+
 ## [1.2.2] — 2026-09-20
 
 ### Robustesse architecturale & API publique (GUI)

@@ -1,7 +1,7 @@
 %{!?_udevrulesdir: %global _udevrulesdir %{_prefix}/lib/udev/rules.d}
 
 Name:           skillkorp-m20
-Version:        1.2.2
+Version:        1.3.0
 Release:        1%{?dist}
 Summary:        Pilote et interface graphique Linux pour souris SkillKorp M20 Ultimate
 License:        MIT
@@ -73,6 +73,12 @@ update-desktop-database %{_datadir}/applications >/dev/null 2>&1 || :
 %{_datadir}/icons/hicolor/256x256/apps/skillkorp-m20.png
 
 %changelog
+* Sun Sep 20 2026 nplacide <nplacide95@gmail.com> - 1.3.0-1
+- Synchronisation temps réel de la configuration entre Tray, GUI et CLI (mtime)
+- Protection contre l'écrasement mutuel des réglages (stale config overwrite)
+- Optimisation des écritures disque dans query_status()
+- Synchronisation de la GUI avec protection de la saisie utilisateur
+- Suite complète de tests unitaires pour le rechargement multi-processus
 * Sun Sep 20 2026 nplacide <nplacide95@gmail.com> - 1.2.2-1
 - Remplacement du parcours de structure interne par Adw.ApplicationWindow et ViewStack
 - Page Boutons dans un Gtk.ScrolledWindow indépendant sans AdwClamp interne

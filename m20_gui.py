@@ -861,7 +861,7 @@ class SkillkorpM20Window(Adw.ApplicationWindow):
         self.battery_row.set_subtitle(f"{bat}%{ch_str}")
         self.bat_progress.set_fraction(max(0.0, min(1.0, bat / 100.0)))
 
-        # Synchronize active DPI stage if changed via physical mouse button
+        # Synchronize active DPI stage if changed via physical mouse button or external tool
         active_stage = st.get("active_stage", 2)
         if hasattr(self, "stage_radios") and 1 <= active_stage <= len(self.stage_radios):
             radio = self.stage_radios[active_stage - 1]
@@ -871,6 +871,24 @@ class SkillkorpM20Window(Adw.ApplicationWindow):
                     radio.set_active(True)
                 finally:
                     self._updating_ui = False
+
+        # Detect external active profile switch (e.g. from tray, CLI, or auto-switching)
+        # Resynchronizes UI widgets only when profile itself changed, preventing unwanted
+        # resets while the user is actively editing fields on the current profile.
+        external_profile_id = self.pm.get_active_profile_id()
+        if external_profile_id != self.current_profile_id:
+            self.current_profile_id = external_profile_id
+            self._updating_ui = True
+            try:
+                if hasattr(self, "profile_ids") and hasattr(self, "profile_combo"):
+                    for idx, pid in enumerate(self.profile_ids):
+                        if pid == external_profile_id:
+                            self.profile_combo.set_selected(idx)
+                            break
+                self._sync_ui_from_current_profile()
+            finally:
+                self._updating_ui = False
+
         return True
 
 

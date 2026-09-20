@@ -126,6 +126,7 @@ class TestReport0x05Checksum(unittest.TestCase):
                 driver = SkillkorpM20Driver.__new__(SkillkorpM20Driver)
                 driver.dev_path = None
                 driver.config = default_config
+                driver._config_mtime = os.path.getmtime(m20_driver.DEFAULT_PROFILE_FILE) if os.path.exists(m20_driver.DEFAULT_PROFILE_FILE) else 0.0
         return driver
 
     def _call_lighting_report(self, driver, **kwargs):
@@ -313,6 +314,7 @@ class TestReport0x04DPI(unittest.TestCase):
                 driver = SkillkorpM20Driver.__new__(SkillkorpM20Driver)
                 driver.dev_path = None
                 driver.config = config.copy()
+                driver._config_mtime = os.path.getmtime(m20_driver.DEFAULT_PROFILE_FILE) if os.path.exists(m20_driver.DEFAULT_PROFILE_FILE) else 0.0
 
         captured = []
 
@@ -371,6 +373,7 @@ class TestQueryStatusClamp(unittest.TestCase):
                 driver = SkillkorpM20Driver.__new__(SkillkorpM20Driver)
                 driver.dev_path = None
                 driver.config = config.copy()
+                driver._config_mtime = os.path.getmtime(m20_driver.DEFAULT_PROFILE_FILE) if os.path.exists(m20_driver.DEFAULT_PROFILE_FILE) else 0.0
         return driver
 
     def test_active_stage_clamped_when_out_of_bounds(self):
@@ -430,6 +433,7 @@ class TestSetButtonsSlotMapping(unittest.TestCase):
                 driver = SkillkorpM20Driver.__new__(SkillkorpM20Driver)
                 driver.dev_path = None
                 driver.config = config.copy()
+                driver._config_mtime = os.path.getmtime(m20_driver.DEFAULT_PROFILE_FILE) if os.path.exists(m20_driver.DEFAULT_PROFILE_FILE) else 0.0
         return driver
 
     def test_set_buttons_report_id(self):
@@ -570,6 +574,92 @@ class TestDefaultProfilesHaveRGBFields(unittest.TestCase):
             for c in color:
                 self.assertGreaterEqual(c, 0)
                 self.assertLessEqual(c, 255)
+
+
+class TestReloadConfigIfChanged(unittest.TestCase):
+    """Tests du rechargement conditionnel de configuration multi-processus."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.config_path = os.path.join(self.temp_dir.name, "default.json")
+        self.initial_config = {
+            "polling_rate": 500,
+            "dpi_stages": [800, 1600],
+            "active_stage": 1,
+            "light_mode": "static",
+            "brightness": 5,
+            "speed": 3,
+            "light_color": [255, 0, 0],
+            "sleep_timer_minutes": 5,
+            "move_to_wake": True,
+            "buttons": {"1": "left_click"},
+            "battery": 80,
+            "charging": False,
+        }
+        with open(self.config_path, "w") as f:
+            json.dump(self.initial_config, f)
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_reload_when_file_modified(self):
+        """Si le fichier change sur le disque, reload_config_if_changed recharge et renvoie True."""
+        with patch("m20_driver.DEFAULT_PROFILE_FILE", self.config_path):
+            with patch.object(SkillkorpM20Driver, "find_device", return_value=None):
+                driver = SkillkorpM20Driver()
+                self.assertEqual(driver.config.get("polling_rate"), 500)
+
+                # Pas de modification : renvoie False
+                self.assertFalse(driver.reload_config_if_changed())
+
+                # Modification externe du fichier (en changeant aussi mtime explicitement)
+                updated_config = self.initial_config.copy()
+                updated_config["polling_rate"] = 1000
+                with open(self.config_path, "w") as f:
+                    json.dump(updated_config, f)
+                new_mtime = os.path.getmtime(self.config_path) + 10.0
+                os.utime(self.config_path, (new_mtime, new_mtime))
+
+                # Le rechargement doit détecter le nouveau mtime et mettre à jour self.config
+                reloaded = driver.reload_config_if_changed()
+                self.assertTrue(reloaded)
+                self.assertEqual(driver.config.get("polling_rate"), 1000)
+
+    def test_reload_when_file_unchanged(self):
+        """Si le fichier n'a pas bougé, reload_config_if_changed renvoie False."""
+        with patch("m20_driver.DEFAULT_PROFILE_FILE", self.config_path):
+            with patch.object(SkillkorpM20Driver, "find_device", return_value=None):
+                driver = SkillkorpM20Driver()
+                self.assertFalse(driver.reload_config_if_changed())
+
+    def test_reload_when_file_missing(self):
+        """Si le fichier n'existe pas, reload_config_if_changed renvoie False sans crash."""
+        missing_path = os.path.join(self.temp_dir.name, "nonexistent.json")
+        with patch("m20_driver.DEFAULT_PROFILE_FILE", missing_path):
+            with patch.object(SkillkorpM20Driver, "find_device", return_value=None):
+                driver = SkillkorpM20Driver()
+                self.assertFalse(driver.reload_config_if_changed())
+
+    def test_query_status_triggers_reload(self):
+        """query_status recharge automatiquement la configuration si modifiée sur le disque."""
+        with patch("m20_driver.DEFAULT_PROFILE_FILE", self.config_path):
+            with patch.object(SkillkorpM20Driver, "find_device", return_value=None):
+                driver = SkillkorpM20Driver()
+                with patch.object(driver, "is_connected", return_value=False):
+                    status = driver.query_status()
+                    self.assertEqual(status["polling_rate_hz"], 500)
+
+                    # Modifier le fichier externe
+                    updated_config = self.initial_config.copy()
+                    updated_config["polling_rate"] = 1000
+                    with open(self.config_path, "w") as f:
+                        json.dump(updated_config, f)
+                    new_mtime = os.path.getmtime(self.config_path) + 10.0
+                    os.utime(self.config_path, (new_mtime, new_mtime))
+
+                    # query_status doit refléter la nouvelle config
+                    status = driver.query_status()
+                    self.assertEqual(status["polling_rate_hz"], 1000)
 
 
 if __name__ == "__main__":

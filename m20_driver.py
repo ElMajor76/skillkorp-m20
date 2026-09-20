@@ -130,9 +130,29 @@ def _HIDIOCSFEATURE(length: int) -> int:
 class SkillkorpM20Driver:
     """High-level Python driver for SkillKorp M20 Ultimate gaming mouse."""
 
+    _config_mtime: float = 0.0
+
     def __init__(self, dev_path: Optional[str] = None):
         self.dev_path = dev_path or self.find_device()
+        self._config_mtime = 0.0
         self.config = self._load_or_default_config()
+
+    def reload_config_if_changed(self) -> bool:
+        """Reload self.config from disk if the configuration file has been modified externally.
+
+        Uses file modification time (mtime) for lightweight checking without unnecessary JSON parsing.
+        Returns True if config was reloaded, False otherwise.
+        """
+        try:
+            if not os.path.exists(DEFAULT_PROFILE_FILE):
+                return False
+            mtime = os.path.getmtime(DEFAULT_PROFILE_FILE)
+            if mtime != getattr(self, "_config_mtime", 0.0):
+                self.config = self._load_or_default_config()
+                return True
+        except OSError:
+            pass
+        return False
 
     @staticmethod
     def find_device() -> Optional[str]:
@@ -218,6 +238,8 @@ class SkillkorpM20Driver:
 
     def query_status(self, poll_hardware: bool = False) -> Dict:
         """Query mouse status. If poll_hardware=True, sends 0x0C query packet over RF."""
+        self.reload_config_if_changed()
+
         if poll_hardware:
             query_buf = bytearray([0x0C, 0x0A, 0x01, 0xFE, 0x01, 0xFE, 0x00, 0x00, 0x00, 0x00])
             try:
@@ -238,14 +260,18 @@ class SkillkorpM20Driver:
                     status = rep[3]
                     battery_pct = rep[4]
                     charging = (status == 2)
-                    self.config["battery"] = battery_pct
-                    self.config["charging"] = charging
-                    self._save_config()
+                    if self.config.get("battery") != battery_pct or self.config.get("charging") != charging:
+                        self.reload_config_if_changed()
+                        self.config["battery"] = battery_pct
+                        self.config["charging"] = charging
+                        self._save_config()
                 elif (w_param & 0xFF00) in (0x1000, 0x2000):
                     new_stage = rep[3]
                     if 1 <= new_stage <= len(self.config.get("dpi_stages", [])):
-                        self.config["active_stage"] = new_stage
-                        self._save_config()
+                        if self.config.get("active_stage") != new_stage:
+                            self.reload_config_if_changed()
+                            self.config["active_stage"] = new_stage
+                            self._save_config()
 
         return {
             "connected": self.is_connected(),
@@ -270,6 +296,7 @@ class SkillkorpM20Driver:
 
     def set_polling_rate(self, rate_hz: int) -> bool:
         """Set mouse polling rate (125, 250, 500, or 1000 Hz)."""
+        self.reload_config_if_changed()
         if rate_hz not in POLLING_RATE_MAP:
             raise ValueError(f"Taux invalide {rate_hz}Hz. Choix valides: {list(POLLING_RATE_MAP.keys())}")
 
@@ -301,6 +328,7 @@ class SkillkorpM20Driver:
         """
         Configure DPI stages and sensor parameters via Report ID 0x04.
         """
+        self.reload_config_if_changed()
         if stages is not None:
             if not (1 <= len(stages) <= 8):
                 raise ValueError("Le nombre d'étapes DPI doit être compris entre 1 et 8.")
@@ -435,6 +463,7 @@ class SkillkorpM20Driver:
         """
         Configure RGB lighting via Report ID 0x05, preserving current sleep timer and wake mode.
         """
+        self.reload_config_if_changed()
         sleep_min = self.config.get("sleep_timer_minutes", 5)
         move_wake = self.config.get("move_to_wake", True)
         success = self._send_lighting_and_power_report(
@@ -461,6 +490,7 @@ class SkillkorpM20Driver:
         """
         Configure hardware sleep timer & wake mode via Report ID 0x05, preserving current lighting settings.
         """
+        self.reload_config_if_changed()
         mode = self.config.get("light_mode", "static")
         brightness = self.config.get("brightness", 8)
         speed = self.config.get("speed", 4)
@@ -490,6 +520,7 @@ class SkillkorpM20Driver:
         5: Backward / Précédent (Slot 7)
         6: DPI Cycle (Slot 3)
         """
+        self.reload_config_if_changed()
         # Normalize all button maps to integer keys to avoid type overwrite bugs
         merged_map: Dict[int, str] = {
             1: "left_click",
@@ -571,7 +602,12 @@ class SkillkorpM20Driver:
                 with open(DEFAULT_PROFILE_FILE, "r") as f:
                     fcntl.flock(f, fcntl.LOCK_SH)
                     try:
-                        return json.load(f)
+                        data = json.load(f)
+                        try:
+                            self._config_mtime = os.path.getmtime(DEFAULT_PROFILE_FILE)
+                        except OSError:
+                            pass
+                        return data
                     finally:
                         fcntl.flock(f, fcntl.LOCK_UN)
             except Exception as e:
@@ -627,11 +663,16 @@ class SkillkorpM20Driver:
                 finally:
                     fcntl.flock(f, fcntl.LOCK_UN)
             os.replace(tmp_path, DEFAULT_PROFILE_FILE)
+            try:
+                self._config_mtime = os.path.getmtime(DEFAULT_PROFILE_FILE)
+            except OSError:
+                pass
         except Exception as e:
             print(f"[m20_driver] Erreur sauvegarde config: {e}", file=sys.stderr)
 
     def apply_all(self) -> bool:
         """Re-apply all saved configuration settings to the mouse."""
+        self.reload_config_if_changed()
         success = True
         try:
             success &= self.set_polling_rate(self.config.get("polling_rate", 1000))
