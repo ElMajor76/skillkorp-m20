@@ -5,6 +5,21 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ---
 
+## [1.2.0] — 2026-09-20
+
+### Nouvelles fonctionnalités & Améliorations majeures
+
+- **Schéma visuel fidèle et interactif de la souris** : remplacement du dessin SVG générique par le visuel photographique haute résolution fidèle à la souris réelle (corps ergonomique noir mat, molette crantée rétroéclairée, boutons latéraux violets/lilas, logo cyan).
+- **Zones cliquables réelles via `Gtk.Overlay`** : 5 zones interactives réelles positionnées directement sur le visuel de la souris (clic gauche, clic droit, molette, bouton avant, bouton arrière) avec mise en surbrillance au survol. Un clic sur une partie de la souris donne le focus et ouvre directement le menu déroulant (`ComboRow.activate()`) associé.
+- **Clarification du bouton 6 (DPI Cycle)** : le bouton 6 est explicitement labellisé comme étant situé sous la souris ("6. DPI Cycle (Sous la souris)"), avec une pastille dédiée `[6] DPI (dessous)`.
+
+### Correctifs
+
+- **`m20_gui.py` (`_init_buttons_page`)** : correction de la cause racine de la non-interactivité de l'onglet Boutons en intégrant les `Adw.ComboRow` dans un `Gtk.ListBox` (classe `.boxed-list`), rétablissant la réception des événements de clic et l'ouverture des menus d'action.
+- **Nettoyage du code** : suppression de l'attribut inopérant `schematic_card.set_padding = 12`.
+
+---
+
 ## [1.1.1] — 2026-09-20
 
 ### Correctifs & Améliorations (extension bouton 6)
