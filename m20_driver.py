@@ -17,6 +17,7 @@ Supports:
 """
 
 import os
+import sys
 import glob
 import fcntl
 import json
@@ -252,7 +253,9 @@ class SkillkorpM20Driver:
             "battery": battery_pct,
             "charging": charging,
             "polling_rate_hz": self.config.get("polling_rate", 1000),
-            "active_dpi": self.config.get("dpi_stages", [800])[self.config.get("active_stage", 2) - 1],
+            "active_dpi": self.config.get("dpi_stages", [800])[
+                max(1, min(self.config.get("active_stage", 2), len(self.config.get("dpi_stages", [800])))) - 1
+            ],
             "active_stage": self.config.get("active_stage", 2),
             "stages": self.config.get("dpi_stages", [400, 800, 1600, 3200, 6400, 26000]),
             "lod_mm": self.config.get("lod", 1),
@@ -314,6 +317,7 @@ class SkillkorpM20Driver:
             self.config["active_stage"] = active_stage
 
         cur_active = self.config.get("active_stage", 2)
+        cur_active = max(1, min(cur_active, len(current_stages)))  # clamp si étapes réduites
         cur_lod = lod if lod is not None else self.config.get("lod", 1)
         cur_debounce = debounce if debounce is not None else self.config.get("debounce", 4)
         cur_ripple = ripple if ripple is not None else self.config.get("ripple", False)
@@ -378,6 +382,49 @@ class SkillkorpM20Driver:
             self._save_config()
         return success
 
+    def _send_lighting_and_power_report(
+        self,
+        mode: str,
+        brightness: int,
+        speed: int,
+        color: Tuple[int, int, int],
+        sleep_timer_minutes: int,
+        move_to_wake: bool,
+    ) -> bool:
+        """
+        Send combined Lighting (bytes 3..8) and Power/Sleep (bytes 9..10) Feature Report 0x05 (15 bytes).
+        Ensures neither lighting nor sleep settings overwrite each other.
+        """
+        mode_id = 2  # default static
+        for m_key, _, m_id in LIGHT_MODES:
+            if m_key == mode.lower():
+                mode_id = m_id
+                break
+
+        brightness = max(1, min(8, int(brightness)))
+        speed = max(1, min(8, int(speed)))
+        sleep_timer_minutes = max(1, min(60, int(sleep_timer_minutes)))
+        r, g, b = color
+
+        buf = bytearray(15)
+        buf[0] = 0x05  # Report ID 5
+        buf[1] = 0x0F  # Length 15
+        buf[2] = 0x01  # Profile index
+        buf[3] = (mode_id << 4) & 0xF0
+        buf[4] = ((brightness & 0x0F) << 4) | (speed & 0x0F)
+        buf[5] = 0x00
+        buf[6] = max(0, min(255, int(r)))
+        buf[7] = max(0, min(255, int(g)))
+        buf[8] = max(0, min(255, int(b)))
+        buf[9] = sleep_timer_minutes
+        buf[10] = 0x00 if move_to_wake else 0x01
+
+        csum = sum(buf[3:11]) & 0xFFFF
+        buf[11] = (csum >> 8) & 0xFF
+        buf[12] = csum & 0xFF
+
+        return self._send_feature_report(buf)
+
     def set_rgb_lighting(
         self,
         mode: str,
@@ -386,34 +433,18 @@ class SkillkorpM20Driver:
         color: Tuple[int, int, int] = (255, 0, 0),
     ) -> bool:
         """
-        Configure RGB lighting via Report ID 0x05.
+        Configure RGB lighting via Report ID 0x05, preserving current sleep timer and wake mode.
         """
-        mode_id = 2  # default static
-        for m_key, _, m_id in LIGHT_MODES:
-            if m_key == mode.lower():
-                mode_id = m_id
-                break
-
-        brightness = max(1, min(8, brightness))
-        speed = max(1, min(8, speed))
-        r, g, b = color
-
-        buf = bytearray(15)
-        buf[0] = 0x05  # Report ID 5
-        buf[1] = 0x0F  # Length 15
-        buf[2] = 0x01
-        buf[3] = (mode_id << 4) & 0xF0
-        buf[4] = ((brightness & 0x0F) << 4) | (speed & 0x0F)
-        buf[5] = 0x00
-        buf[6] = r
-        buf[7] = g
-        buf[8] = b
-
-        csum = (buf[3] + buf[4] + buf[5] + buf[6] + buf[7] + buf[8]) & 0xFFFF
-        buf[11] = (csum >> 8) & 0xFF
-        buf[12] = csum & 0xFF
-
-        success = self._send_feature_report(buf)
+        sleep_min = self.config.get("sleep_timer_minutes", 5)
+        move_wake = self.config.get("move_to_wake", True)
+        success = self._send_lighting_and_power_report(
+            mode=mode,
+            brightness=brightness,
+            speed=speed,
+            color=color,
+            sleep_timer_minutes=sleep_min,
+            move_to_wake=move_wake,
+        )
         if success:
             self.config["light_mode"] = mode
             self.config["brightness"] = brightness
@@ -428,29 +459,20 @@ class SkillkorpM20Driver:
         move_to_wake: bool = True,
     ) -> bool:
         """
-        Configure hardware sleep timer & wake mode via Report ID 0x05.
-        - sleep_timer_minutes: 1 to 60 minutes
-        - move_to_wake: True for Move-to-wake (0x00), False for Click-to-wake (0x01)
+        Configure hardware sleep timer & wake mode via Report ID 0x05, preserving current lighting settings.
         """
-        sleep_timer_minutes = max(1, min(60, int(sleep_timer_minutes)))
-        buf = bytearray(15)
-        buf[0] = 0x05  # Report ID 5
-        buf[1] = 0x0F  # Length 15
-        buf[2] = 0x01  # Profile index
-        buf[3] = 0x00
-        buf[4] = 0x00
-        buf[5] = 0x00
-        buf[6] = 0x00
-        buf[7] = 0x00
-        buf[8] = 0x00
-        buf[9] = sleep_timer_minutes
-        buf[10] = 0x00 if move_to_wake else 0x01
-
-        csum = (buf[3] + buf[4] + buf[5] + buf[6] + buf[7] + buf[8] + buf[9] + buf[10]) & 0xFFFF
-        buf[11] = (csum >> 8) & 0xFF
-        buf[12] = csum & 0xFF
-
-        success = self._send_feature_report(buf)
+        mode = self.config.get("light_mode", "static")
+        brightness = self.config.get("brightness", 8)
+        speed = self.config.get("speed", 4)
+        color = tuple(self.config.get("light_color", [255, 0, 0]))
+        success = self._send_lighting_and_power_report(
+            mode=mode,
+            brightness=brightness,
+            speed=speed,
+            color=color,
+            sleep_timer_minutes=sleep_timer_minutes,
+            move_to_wake=move_to_wake,
+        )
         if success:
             self.config["sleep_timer_minutes"] = sleep_timer_minutes
             self.config["move_to_wake"] = move_to_wake
@@ -595,8 +617,8 @@ class SkillkorpM20Driver:
         try:
             with open(DEFAULT_PROFILE_FILE, "w") as f:
                 json.dump(self.config, f, indent=2)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[m20_driver] Erreur sauvegarde config: {e}", file=sys.stderr)
 
     def apply_all(self) -> bool:
         """Re-apply all saved configuration settings to the mouse."""
@@ -615,9 +637,11 @@ class SkillkorpM20Driver:
                 colors=self.config.get("dpi_colors"),
             )
             time.sleep(0.05)
-            success &= self.set_power_settings(
-                sleep_timer_minutes=self.config.get("sleep_timer_minutes", 5),
-                move_to_wake=self.config.get("move_to_wake", True),
+            success &= self.set_rgb_lighting(
+                mode=self.config.get("light_mode", "static"),
+                brightness=self.config.get("brightness", 8),
+                speed=self.config.get("speed", 4),
+                color=tuple(self.config.get("light_color", [255, 0, 0])),
             )
             time.sleep(0.05)
             button_map = {int(k): v for k, v in self.config.get("buttons", {}).items()}
