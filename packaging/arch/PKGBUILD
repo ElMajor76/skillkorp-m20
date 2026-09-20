@@ -1,6 +1,6 @@
 # Maintainer: nplacide <nplacide95@gmail.com>
 pkgname=skillkorp-m20
-pkgver=1.2.0
+pkgver=1.2.1
 pkgrel=1
 pkgdesc="Pilote Linux, utilitaire CLI et GUI pour souris gaming SkillKorp M20 Ultimate"
 arch=('any')

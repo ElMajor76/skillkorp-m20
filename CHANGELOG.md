@@ -5,6 +5,18 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ---
 
+## [1.2.1] — 2026-09-20
+
+### Correctifs & Améliorations de l'interface graphique (GUI)
+
+- **Déclampage horizontal de l'onglet Boutons** : adaptation dynamique de la largeur du conteneur interne `Adw.Clamp` de la page Boutons (`clamp.set_maximum_size(1040)` et `tightening_threshold(860)`), permettant d'exploiter pleinement la largeur de la fenêtre et évitant l'écrasement des contrôles.
+- **Résolution du retour à la ligne intempestif des titres** : simplification des libellés de boutons en intitulés courts et lisibles sur une seule ligne ("1. Clic Gauche", "2. Clic Droit", "3. Molette", "4. Latéral Avant", "5. Latéral Arrière", "6. DPI Cycle") avec forçage de `title_lines=1`.
+- **Infobulles détaillées** : report des descriptions complètes et des rôles d'origine dans des infobulles contextuelles claires (`set_tooltip_text`).
+- **Élimination de la troncature des actions actives ("C...")** : extension dynamique du nombre maximal de caractères (`max_width_chars=45`) sur l'étiquette interne de valeur des `Adw.ComboRow`, garantissant la lisibilité intégrale de toutes les actions sélectionnées (ex: "Poste de Travail (Fichiers)", "Fermer Fenêtre (Alt+F4)", "Verrouiller PC (Win+L)").
+- **Ajustement des dimensions par défaut** : dimensionnement par défaut de la fenêtre porté à 980×760 px (taille minimale recommandée 800×640 px), et largeur minimale de la liste de sélection des boutons fixée à 440 px.
+
+---
+
 ## [1.2.0] — 2026-09-20
 
 ### Nouvelles fonctionnalités & Améliorations majeures

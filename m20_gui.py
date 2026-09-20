@@ -34,13 +34,14 @@ from gi.repository import Gtk, Adw, GLib, Gio, Gdk
 class SkillkorpM20Window(Adw.PreferencesWindow):
     def __init__(self, app):
         super().__init__(application=app, title="SkillKorp M20 Ultimate")
-        self.set_default_size(840, 720)
+        self.set_default_size(980, 760)
+        self.set_size_request(800, 640)
 
         self.driver = SkillkorpM20Driver()
         self.pm = ProfileManager()
         self._updating_ui = False
 
-        # Custom CSS for interactive mouse schematic overlay buttons
+        # Custom CSS for interactive mouse schematic overlay buttons and layout
         css_provider = Gtk.CssProvider()
         css_provider.load_from_string("""
         .mouse-overlay-btn {
@@ -55,6 +56,9 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
         }
         .mouse-overlay-btn:active {
             background-color: rgba(53, 132, 228, 0.6);
+        }
+        .button-listbox {
+            min-width: 440px;
         }
         """)
         display = Gdk.Display.get_default()
@@ -367,6 +371,16 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
         page = Adw.PreferencesPage(title="Boutons", icon_name="input-gaming-symbolic")
         self.add(page)
 
+        # Allow the Buttons page to expand horizontally beyond the default 600px clamp
+        scrolled = page.get_first_child()
+        if scrolled and hasattr(scrolled, "get_child"):
+            viewport = scrolled.get_child()
+            if viewport and hasattr(viewport, "get_child"):
+                clamp = viewport.get_child()
+                if isinstance(clamp, Adw.Clamp):
+                    clamp.set_maximum_size(1040)
+                    clamp.set_tightening_threshold(860)
+
         # Main Layout: Schematic and Configuration
         main_group = Adw.PreferencesGroup(
             title="Attribution Visuelle des Boutons",
@@ -378,19 +392,22 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
         hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=24)
         hbox.set_margin_top(12)
         hbox.set_margin_bottom(12)
-        hbox.set_halign(Gtk.Align.CENTER)
+        hbox.set_halign(Gtk.Align.FILL)
+        hbox.set_hexpand(True)
 
         # Configuration and labels
         self.btn_action_keys = list(BUTTON_ACTIONS.keys())
         btn_action_labels = [info[0] for info in BUTTON_ACTIONS.values()]
-        button_names = [
-            "1. Clic Gauche (Principal)",
-            "2. Clic Droit (Secondaire)",
-            "3. Molette (Clic Central)",
-            "4. Latéral Avant (Suivant)",
-            "5. Latéral Arrière (Précédent)",
-            "6. DPI Cycle (Sous la souris)",
+        button_defs = [
+            ("1. Clic Gauche", "Bouton principal (Action par défaut : Clic Gauche)"),
+            ("2. Clic Droit", "Bouton secondaire (Action par défaut : Clic Droit)"),
+            ("3. Molette", "Bouton central de la molette (Action par défaut : Clic Central)"),
+            ("4. Latéral Avant", "Bouton latéral avant (Action par défaut : Suivant)"),
+            ("5. Latéral Arrière", "Bouton latéral arrière (Action par défaut : Précédent)"),
+            ("6. DPI Cycle", "Bouton de cycle DPI situé sous la souris (Action par défaut : Cycle DPI)"),
         ]
+        button_names = [b[0] for b in button_defs]
+        button_tooltips = [b[1] for b in button_defs]
         default_actions = ["left_click", "right_click", "middle_click", "forward", "backward", "dpi_cycle"]
         current_buttons = self.driver.config.get("buttons", {})
 
@@ -454,7 +471,7 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
         for btn_num in range(1, 6):
             btn_pill = Gtk.Button(label=f"[{btn_num}]")
             btn_pill.add_css_class("circular")
-            btn_pill.set_tooltip_text(button_names[btn_num - 1])
+            btn_pill.set_tooltip_text(button_tooltips[btn_num - 1])
             btn_pill.connect("clicked", self._on_schematic_btn_clicked, btn_num)
             pill_box.append(btn_pill)
 
@@ -471,13 +488,18 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
         # Right: The 6 Buttons ComboRows
         btn_rows_box = Gtk.ListBox()
         btn_rows_box.add_css_class("boxed-list")
+        btn_rows_box.add_css_class("button-listbox")
         btn_rows_box.set_selection_mode(Gtk.SelectionMode.NONE)
+        btn_rows_box.set_size_request(440, -1)
         btn_rows_box.set_hexpand(True)
         btn_rows_box.set_valign(Gtk.Align.CENTER)
 
         self.btn_combos = []
         for i in range(1, 7):
             row = Adw.ComboRow(title=button_names[i - 1])
+            if hasattr(row, "set_title_lines"):
+                row.set_title_lines(1)
+            row.set_tooltip_text(button_tooltips[i - 1])
             string_list = Gtk.StringList.new(btn_action_labels)
             row.set_model(string_list)
 
@@ -487,6 +509,8 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
             except ValueError:
                 selected_idx = 0
             row.set_selected(selected_idx)
+            row.connect("map", lambda r: self._expand_combo_row_labels(r, 45))
+            row.connect("notify::selected", lambda r, p: GLib.idle_add(self._expand_combo_row_labels, r, 45))
             self.btn_combos.append(row)
             btn_rows_box.append(row)
 
@@ -515,6 +539,17 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
         btn_box.append(rst_btn)
 
         apply_group.add(btn_box)
+
+    @staticmethod
+    def _expand_combo_row_labels(row: Adw.ComboRow, max_chars: int = 45):
+        def _walk(w):
+            ch = w.get_first_child()
+            while ch:
+                if isinstance(ch, Gtk.Label) and ch.get_max_width_chars() == 20:
+                    ch.set_max_width_chars(max_chars)
+                _walk(ch)
+                ch = ch.get_next_sibling()
+        _walk(row)
 
     def _on_schematic_btn_clicked(self, widget, btn_num: int):
         idx = btn_num - 1
