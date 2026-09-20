@@ -28,7 +28,7 @@ from profile_manager import (
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Gtk, Adw, GLib, Gio
+from gi.repository import Gtk, Adw, GLib, Gio, Gdk
 
 
 class SkillkorpM20Window(Adw.PreferencesWindow):
@@ -39,6 +39,31 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
         self.driver = SkillkorpM20Driver()
         self.pm = ProfileManager()
         self._updating_ui = False
+
+        # Custom CSS for interactive mouse schematic overlay buttons
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_string("""
+        .mouse-overlay-btn {
+            background-color: transparent;
+            border-radius: 8px;
+            border: 1px solid transparent;
+            transition: all 150ms ease-in-out;
+        }
+        .mouse-overlay-btn:hover {
+            background-color: rgba(53, 132, 228, 0.35);
+            border: 1px solid rgba(53, 132, 228, 0.7);
+        }
+        .mouse-overlay-btn:active {
+            background-color: rgba(53, 132, 228, 0.6);
+        }
+        """)
+        display = Gdk.Display.get_default()
+        if display:
+            Gtk.StyleContext.add_provider_for_display(
+                display,
+                css_provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+            )
 
         # Load active profile data
         self.current_profile_id = self.pm.get_active_profile_id()
@@ -355,33 +380,91 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
         hbox.set_margin_bottom(12)
         hbox.set_halign(Gtk.Align.CENTER)
 
-        # Left: Interactive Mouse Schematic Card
+        # Configuration and labels
+        self.btn_action_keys = list(BUTTON_ACTIONS.keys())
+        btn_action_labels = [info[0] for info in BUTTON_ACTIONS.values()]
+        button_names = [
+            "1. Clic Gauche (Principal)",
+            "2. Clic Droit (Secondaire)",
+            "3. Molette (Clic Central)",
+            "4. Latéral Avant (Suivant)",
+            "5. Latéral Arrière (Précédent)",
+            "6. DPI Cycle (Sous la souris)",
+        ]
+        default_actions = ["left_click", "right_click", "middle_click", "forward", "backward", "dpi_cycle"]
+        current_buttons = self.driver.config.get("buttons", {})
+
+        # Left: Interactive Mouse Schematic Card with Faithful Visual
         schematic_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         schematic_card.add_css_class("card")
         schematic_card.set_margin_top(4)
         schematic_card.set_margin_bottom(4)
         schematic_card.set_margin_start(4)
         schematic_card.set_margin_end(4)
-        schematic_card.set_size_request(260, 360)
+        schematic_card.set_size_request(240, 420)
+        schematic_card.set_halign(Gtk.Align.CENTER)
 
-        svg_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "assets", "m20_schematic.svg")
-        if os.path.exists(svg_path):
-            picture = Gtk.Picture.new_for_filename(svg_path)
-            picture.set_can_shrink(True)
+        overlay = Gtk.Overlay()
+        overlay.set_size_request(194, 360)
+        overlay.set_halign(Gtk.Align.CENTER)
+        overlay.set_margin_top(8)
+
+        img_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "assets", "mouse_view.png")
+        if not os.path.exists(img_path):
+            img_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "assets", "mouse_clean.png")
+        if not os.path.exists(img_path):
+            img_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "assets", "m20_schematic.svg")
+
+        if os.path.exists(img_path):
+            picture = Gtk.Picture.new_for_filename(img_path)
+            picture.set_can_shrink(False)
             picture.set_content_fit(Gtk.ContentFit.CONTAIN)
-            picture.set_size_request(240, 300)
-            schematic_card.append(picture)
+            picture.set_size_request(194, 360)
+            overlay.set_child(picture)
+
+            # 5 interactive overlay zones over the top-view mouse (btn_num, tooltip, x, y, width, height)
+            zones = [
+                (1, "1. Clic Gauche", 18, 5, 68, 135),
+                (2, "2. Clic Droit", 110, 5, 68, 135),
+                (3, "3. Molette (Clic Central)", 84, 28, 26, 72),
+                (4, "4. Latéral Avant (Suivant)", 0, 110, 26, 50),
+                (5, "5. Latéral Arrière (Précédent)", 0, 166, 26, 52),
+            ]
+            for btn_num, tooltip, x, y, w, h in zones:
+                btn_zone = Gtk.Button()
+                btn_zone.add_css_class("flat")
+                btn_zone.add_css_class("mouse-overlay-btn")
+                btn_zone.set_tooltip_text(tooltip)
+                btn_zone.set_halign(Gtk.Align.START)
+                btn_zone.set_valign(Gtk.Align.START)
+                btn_zone.set_margin_start(x)
+                btn_zone.set_margin_top(y)
+                btn_zone.set_size_request(w, h)
+                btn_zone.connect("clicked", self._on_schematic_btn_clicked, btn_num)
+                overlay.add_overlay(btn_zone)
+
+        schematic_card.append(overlay)
 
         # Quick Jump Button Pills under schematic
         pill_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         pill_box.set_halign(Gtk.Align.CENTER)
+        pill_box.set_margin_top(4)
         pill_box.set_margin_bottom(8)
 
-        for btn_num in range(1, 7):
+        for btn_num in range(1, 6):
             btn_pill = Gtk.Button(label=f"[{btn_num}]")
             btn_pill.add_css_class("circular")
+            btn_pill.set_tooltip_text(button_names[btn_num - 1])
             btn_pill.connect("clicked", self._on_schematic_btn_clicked, btn_num)
             pill_box.append(btn_pill)
+
+        # Button 6 pill: clearly indicated as located under the mouse
+        btn6_pill = Gtk.Button(label="[6] DPI (dessous)")
+        btn6_pill.add_css_class("pill")
+        btn6_pill.set_tooltip_text("6. DPI Cycle — Bouton situé sous la souris")
+        btn6_pill.connect("clicked", self._on_schematic_btn_clicked, 6)
+        pill_box.append(btn6_pill)
+
         schematic_card.append(pill_box)
         hbox.append(schematic_card)
 
@@ -391,19 +474,6 @@ class SkillkorpM20Window(Adw.PreferencesWindow):
         btn_rows_box.set_selection_mode(Gtk.SelectionMode.NONE)
         btn_rows_box.set_hexpand(True)
         btn_rows_box.set_valign(Gtk.Align.CENTER)
-
-        self.btn_action_keys = list(BUTTON_ACTIONS.keys())
-        btn_action_labels = [info[0] for info in BUTTON_ACTIONS.values()]
-        button_names = [
-            "1. Clic Gauche (Principal)",
-            "2. Clic Droit (Secondaire)",
-            "3. Molette (Clic Central)",
-            "4. Latéral Avant (Suivant)",
-            "5. Latéral Arrière (Précédent)",
-            "6. DPI Cycle (Bas du pouce)",
-        ]
-        default_actions = ["left_click", "right_click", "middle_click", "forward", "backward", "dpi_cycle"]
-        current_buttons = self.driver.config.get("buttons", {})
 
         self.btn_combos = []
         for i in range(1, 7):
