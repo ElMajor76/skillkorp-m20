@@ -7,7 +7,8 @@ arch=('any')
 url="https://github.com/ElMajor76/skillkorp-m20"
 license=('MIT')
 depends=('python' 'python-gobject' 'libadwaita' 'systemd')
-optdepends=()
+optdepends=('libayatana-appindicator: support de l\'indicateur dans la barre des tâches'
+            'libnotify: notifications de bureau pour la batterie et le DPI')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/ElMajor76/$pkgname/archive/refs/tags/v$pkgver.tar.gz")
 sha256sums=('SKIP')
 
@@ -16,12 +17,16 @@ package() {
 
     install -dm755 "$pkgdir/usr/share/$pkgname"
     install -Dm755 m20_driver.py "$pkgdir/usr/share/$pkgname/m20_driver.py"
+    install -Dm755 profile_manager.py "$pkgdir/usr/share/$pkgname/profile_manager.py"
     install -Dm755 m20_gui.py "$pkgdir/usr/share/$pkgname/m20_gui.py"
+    install -Dm755 m20_tray.py "$pkgdir/usr/share/$pkgname/m20_tray.py"
     install -Dm755 m20ctl "$pkgdir/usr/share/$pkgname/m20ctl"
+    cp -r assets "$pkgdir/usr/share/$pkgname/"
 
     install -dm755 "$pkgdir/usr/bin"
     ln -s "/usr/share/$pkgname/m20ctl" "$pkgdir/usr/bin/m20ctl"
     ln -s "/usr/share/$pkgname/m20_gui.py" "$pkgdir/usr/bin/m20-gui"
+    ln -s "/usr/share/$pkgname/m20_tray.py" "$pkgdir/usr/bin/m20-tray"
 
     install -Dm644 udev/99-skillkorp-m20.rules "$pkgdir/usr/lib/udev/rules.d/99-skillkorp-m20.rules"
     install -Dm644 io.github.skillkorp.m20.desktop "$pkgdir/usr/share/applications/io.github.skillkorp.m20.desktop"
